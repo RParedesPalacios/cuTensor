@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
- 
+#include "gpu.h"
+
 using namespace std;
 
 

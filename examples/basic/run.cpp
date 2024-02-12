@@ -1,6 +1,5 @@
 #include <iostream>
 #include "cutensor.h"
-#include "gpu.h"
 
 int main() {
     gpu_init();

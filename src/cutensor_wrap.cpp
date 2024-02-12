@@ -1,7 +1,6 @@
 #include <iostream>
 #include <iomanip>
 #include "cutensor.h"
-#include "gpu.h"
 #include "gpu_ops.h"
 
 using namespace std;
