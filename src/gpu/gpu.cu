@@ -1,0 +1,129 @@
+/*
+* EDDL Library - European Distributed Deep Learning Library.
+* Version: 1.1
+* copyright (c) 2022, Universitat Politècnica de València (UPV), PRHLT Research Centre
+* Date: March 2022
+* Author: PRHLT Research Centre, UPV, (rparedes@prhlt.upv.es), (jon@prhlt.upv.es)
+* All rights reserved
+*/
+
+#include <cstdio>
+#include <string>
+#include <stdexcept>
+#include <iostream>
+
+#include "../../include/gpu/gpu.h"
+
+cublasHandle_t hcublas[64];
+curandGenerator_t random_generator[64];
+cublasStatus_t bstatus;
+curandStatus_t rstatus;
+
+
+void check_cuda(cudaError_t err,const char *msg)
+{
+    if(err!=cudaSuccess)
+    {
+        std::string error_type = cudaGetErrorString(err);
+        std::string text = "[CUDA ERROR]: " + error_type + " ("+ std::to_string(err) + ") raised in " + std::string(msg) + " | (check_cuda)";
+        throw std::runtime_error(text);
+    }
+
+}
+
+void gpu_init()
+{
+
+    int nDevices;
+    cudaGetDeviceCount(&nDevices);
+
+    for (int i=0;i<nDevices;i++)
+    {
+        cudaSetDevice(i);
+        cudaDeviceProp prop;
+        cudaGetDeviceProperties(&prop,i);
+
+        fprintf(stderr,"GPU device %d, %s, ready\n",i,prop.name);
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+void gpu_set_device(int device)
+{
+    cudaSetDevice(device);
+}
+
+int gpu_devices()
+{
+    int nDevices;
+    cudaGetDeviceCount(&nDevices);
+    return nDevices;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+float* gpu_create_tensor(int dev,long int size)
+{
+    float* devicePointer;
+    if (cudaSetDevice(dev)!=cudaSuccess)
+    {
+        std::string text = "error setting device "+std::to_string(dev)+" in gpu_create_tensor | (gpu_create_tensor)";
+        throw std::runtime_error(text);
+    }
+    check_cuda(cudaMalloc((void**)&devicePointer,size*sizeof(float)),"create_tensor");
+    return devicePointer;
+}
+
+void gpu_delete_tensor(int dev, float* p)
+{
+    cudaSetDevice(dev);
+    check_cuda(cudaFree(p),"delete_tensor");
+}
+
+void gpu_copy_to_device(int device, long int size, float *ptr, float *cpu_ptr)
+{
+    cudaSetDevice(device);
+    check_cuda(cudaMemcpy(ptr,cpu_ptr,size*sizeof(float),cudaMemcpyHostToDevice),"copy_to_device");
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+__global__ void fill_(float* a, float v, long int size){
+    long int thread_id_x = threadIdx.x+blockIdx.x*blockDim.x;
+
+    if (thread_id_x < size){
+        a[thread_id_x]=v;
+    }
+}
+void gpu_fill_(int device, long int size, float *ptr, float v) {
+    cudaSetDevice(device);
+
+    setDims(size);
+
+    fill_<<<dimGrid,dimBlock>>>(ptr,v,size);
+    check_cuda(cudaDeviceSynchronize(),"set");
+}
+
+
+__global__ void print_(float* a, long int size){
+    long int thread_id_x = threadIdx.x+blockIdx.x*blockDim.x;
+
+    if (thread_id_x < size){
+        printf("%f ",a[thread_id_x]);
+    }
+}
+void gpu_print_(int device, long int size, float *ptr) {
+    cudaSetDevice(device);
+
+    setDims(size);
+
+    print_<<<dimGrid,dimBlock>>>(ptr,size);
+    check_cuda(cudaDeviceSynchronize(),"print");
+}
