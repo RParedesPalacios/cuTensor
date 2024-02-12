@@ -1,6 +1,5 @@
 #include <iostream>
 #include "cutensor.h"
-#include "tensor.h"
 #include "gpu.h"
 
 int main() {
@@ -19,8 +18,6 @@ int main() {
     info(t1);
     info(t2);
     info(t3);
-
-    print(t3);
 
     delete t1;
     delete t2;
