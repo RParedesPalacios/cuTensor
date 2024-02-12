@@ -46,17 +46,12 @@ void find_match_dims(tshape a, tshape b, int &apos, int &bpos, int &match )
         }
 
         if (j<b.size()-1) {
-            match=m;
-            apos=i;
-            bpos=j;
+            match=m; apos=i; bpos=j;
             return;
         }
     }
 
-    if (i<1) {
-        match=-1;
-        return;
-    }
+    if (i<1) match=-1;
     return;
 }
 
