@@ -1,3 +1,5 @@
+# Create build directory
+$(shell mkdir -p build)
 
 # Compiler options
 CXX = g++
