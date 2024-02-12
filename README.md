@@ -7,6 +7,4 @@ git clone https://github.com/RParedesPalacios/cuTensor.git
 
 cd cuTensor
 
-mkdir build
-
 make
