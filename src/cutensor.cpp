@@ -2,6 +2,7 @@
 #include <iomanip>
 #include "cutensor.h"
 #include "gpu.h"
+#include "gpu_ops.h"
 
 using namespace std;
 
@@ -59,3 +60,49 @@ void cuTensor::print()
     gpu_print_(device, size, ptr);
     cout << endl;
 }
+
+void msg(char *s)
+{
+    printf("%s",s);
+    exit(1);
+}
+
+///////////////////////////////////////////
+// OPS
+///////////////////////////////////////////
+cuTensor * cuTensor::sum(cuTensor *A, cuTensor *B)
+{
+    if (A->size!=B->size) msg("error tensor size mismatch\n");
+    if (A->device!=B->device) msg("error tensor device mismatch\n");
+
+    cuTensor *C=new cuTensor(A->shape,A->device);
+    gpu_sum(A->ptr,B->ptr,C->ptr,A->size,A->device,false);
+
+    return C;
+}
+
+///////////////////////////////////////////
+// WRAPS
+///////////////////////////////////////////
+cuTensor * create(const vector<int> &s, const int dev, float *cpu_ptr)
+{
+    return new cuTensor(s,dev,cpu_ptr);
+}
+cuTensor * create(const vector<int> &s, const int dev)
+{
+    return new cuTensor(s,dev);
+}
+cuTensor * create(const vector<int> &s, float *cpu_ptr)
+{
+    return new cuTensor(s,cpu_ptr);
+}
+cuTensor * create(const vector<int> &s)
+{
+    return new cuTensor(s);
+}
+
+cuTensor * sum(cuTensor *A, cuTensor *B) { return cuTensor::sum(A,B);}
+
+void fill(cuTensor *A, float value) { A->fill(value);}
+
+void print(cuTensor *A) { A->print();}

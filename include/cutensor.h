@@ -23,4 +23,19 @@ class cuTensor {
     // Methods
     void fill(float value);
     void print();
+
+    //OPS
+    static cuTensor *sum(cuTensor *A, cuTensor *B);
 };
+
+typedef cuTensor* T;
+
+// wrapp OPS
+cuTensor * create(const vector<int> &s, const int dev, float *cpu_ptr);
+cuTensor * create(const vector<int> &s, const int dev);
+cuTensor * create(const vector<int> &s, float *cpu_ptr);
+cuTensor * create(const vector<int> &s);
+
+cuTensor * sum(cuTensor *A, cuTensor *B);
+void fill(cuTensor *A, float value);
+void print(cuTensor *A);

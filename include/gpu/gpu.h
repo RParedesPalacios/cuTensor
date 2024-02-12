@@ -8,6 +8,7 @@
 #define MAX_TPB 1024
 #define setDims(size) int setdim_r,setdim_c;setdim_r=(size/MAX_TPB);if (setdim_r==0) {setdim_r=1;setdim_c=size;}else {if (size%MAX_TPB) setdim_r++;setdim_c=MAX_TPB;}dim3 dimGrid(setdim_r);dim3 dimBlock(setdim_c);
 
+void check_cuda(cudaError_t err,const char *msg);
 void gpu_init();
 
 void gpu_set_device(int device);

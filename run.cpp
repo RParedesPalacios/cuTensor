@@ -4,20 +4,21 @@
 #include "gpu.h"
 
 int main() {
-    // Set the device to device 0
+    T t1,t2,t3;
     gpu_init();
     
-    Tensor *t1=new Tensor({2,3,4});
-    t1->fill(1.0);
-    t1->print();
+    t1=create({2,3,4},1);
+    fill(t1,1.0);
+    
+    t2=create({6,4},1);
+    fill(t2,2.0);
 
-    Tensor *t2=new Tensor({6,4},t1->get_ptr()); // sharing ptr
-    t2->print();
+    t3=sum(t1,t2);
+    print(t3);
 
-    cuTensor *t=new cuTensor({2,3,4},t1->get_ptr());
-    t->print();
-
-    delete t;
+    delete t1;
+    delete t2;
+    delete t3;
  
     return 0;
 }
