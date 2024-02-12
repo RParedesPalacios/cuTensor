@@ -27,3 +27,14 @@ void gpu_sum(float *ptrA, float *ptrB, float *ptrC, long int size, int device, b
     gpu_sum_<<<dimGrid,dimBlock>>>(ptrA,ptrB,ptrC,size,inc);
     check_cuda(cudaDeviceSynchronize(),"gpu_sum_");
 }
+
+// gpu mult2D C=A*B ussin cuBLAS taking into account that the matrices are stored in row-major order
+void gpu_mult2D(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int device) // m=A0,n=A1,k=B1
+{
+    cudaSetDevice(device);
+    
+    float alpha = 1.0;
+    float beta = 0.0;
+
+    check_cublas(cublasSgemm(hcublas[device], CUBLAS_OP_N, CUBLAS_OP_N, k, m, n, &alpha, ptrB, k, ptrA, n, &beta, ptrC, k), "cublasSgemm");
+}

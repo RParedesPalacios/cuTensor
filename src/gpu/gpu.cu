@@ -21,7 +21,14 @@ void check_cuda(cudaError_t err,const char *msg)
     }
 
 }
-
+void check_cublas(cublasStatus_t status, const char *f)
+{
+    if ( status!=  CUBLAS_STATUS_SUCCESS)
+    {
+        std::string text = "error in cublas execution in " + std::string(f) + " | (check_cublas)";
+        throw std::runtime_error(text);
+    }
+}
 void gpu_init()
 {
 
@@ -35,6 +42,9 @@ void gpu_init()
         cudaGetDeviceProperties(&prop,i);
 
         fprintf(stderr,"GPU device %d, %s, ready\n",i,prop.name);
+
+        check_cublas(cublasCreate(&(hcublas[i])),"cublasCreate");
+        fprintf(stderr,"CuBLAS running on GPU device %s\n",prop.name);
     }
 }
 
@@ -85,6 +95,11 @@ void gpu_copy_to_device(int device, long int size, float *ptr, float *cpu_ptr)
 /////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////
+void gpu_copy_(int device, long int size, float *ptr, float *cpu_ptr)
+{
+    cudaSetDevice(device);
+    check_cuda(cudaMemcpy(cpu_ptr,ptr,size*sizeof(float),cudaMemcpyDeviceToHost),"gpu_copy");
+}
 
 __global__ void fill_(float* a, float v, long int size){
     long int thread_id_x = threadIdx.x+blockIdx.x*blockDim.x;

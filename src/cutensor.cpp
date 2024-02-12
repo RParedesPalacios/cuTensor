@@ -6,6 +6,11 @@
 
 using namespace std;
 
+void msg(const char *s)
+{
+    printf("%s",s);
+    exit(1);
+}
 ////////////////////////////////////////
 // Constructor and Destructor
 ////////////////////////////////////////
@@ -23,8 +28,11 @@ cuTensor::cuTensor(const vector<int> &s, const int dev, float *cpu_ptr)
     device = dev;
     
     size=1;
-    for (int i = ndim - 1; i >= 0; i--) {size *= shape[i];}
-        
+    for (int i = ndim - 1; i >= 0; i--) {
+        if (shape[i]<0) msg("error negative shape");
+        size *= shape[i];
+    }
+
     ptr = gpu_create_tensor(device,size);
     if (cpu_ptr != nullptr)
         gpu_copy_to_device(device, size, ptr, cpu_ptr);
@@ -43,11 +51,18 @@ cuTensor::~cuTensor()
 ////////////////////////////////////////
 // Methods
 ////////////////////////////////////////
+cuTensor *cuTensor::clone()
+{
+    cuTensor *B = new cuTensor(shape, device);
+    gpu_copy_(device, size, ptr, B->ptr);
+    return B;
+}
+
 void cuTensor::fill(float value)
 {
     gpu_fill_(device, size, ptr, value);
 }
-void cuTensor::print()
+void cuTensor::info()
 {
     cout << "Tensor in device: GPU " << device << endl;
     cout << "Tensor shape: ";
@@ -56,53 +71,41 @@ void cuTensor::print()
         cout << shape[i] << " ";
     }
     cout << endl;
-
+}
+void cuTensor::print()
+{
+    info();
     gpu_print_(device, size, ptr);
     cout << endl;
 }
 
-void msg(char *s)
+/// reshape tensor to a new shape, admiting "-1" e.g. (2,3,5) to (-1,5) should be (6,5) 
+void cuTensor::reshape(const vector<int> &nshape)
 {
-    printf("%s",s);
-    exit(1);
+    int newsize = 1;
+    int neg_index = -1;
+    vector<int> newshape=nshape;
+
+    for (int i = 0; i < newshape.size(); i++)
+    {
+        if (newshape[i] == -1)
+        {
+            if (neg_index != -1) msg("error: multiple occurrences of -1 in new shape\n");
+            neg_index = i;
+        }
+        else newsize *= newshape[i];
+    }
+
+    if (neg_index != -1)
+    {
+        if (size % newsize != 0) msg("error: cannot reshape tensor, size mismatch\n");
+        newshape[neg_index] = size / newsize;
+    }
+    else
+    {
+        if (newsize != size) msg("error: cannot reshape tensor, size mismatch\n");
+    }
+
+    shape = newshape;
+    ndim = shape.size();
 }
-
-///////////////////////////////////////////
-// OPS
-///////////////////////////////////////////
-cuTensor * cuTensor::sum(cuTensor *A, cuTensor *B)
-{
-    if (A->size!=B->size) msg("error tensor size mismatch\n");
-    if (A->device!=B->device) msg("error tensor device mismatch\n");
-
-    cuTensor *C=new cuTensor(A->shape,A->device);
-    gpu_sum(A->ptr,B->ptr,C->ptr,A->size,A->device,false);
-
-    return C;
-}
-
-///////////////////////////////////////////
-// WRAPS
-///////////////////////////////////////////
-cuTensor * create(const vector<int> &s, const int dev, float *cpu_ptr)
-{
-    return new cuTensor(s,dev,cpu_ptr);
-}
-cuTensor * create(const vector<int> &s, const int dev)
-{
-    return new cuTensor(s,dev);
-}
-cuTensor * create(const vector<int> &s, float *cpu_ptr)
-{
-    return new cuTensor(s,cpu_ptr);
-}
-cuTensor * create(const vector<int> &s)
-{
-    return new cuTensor(s);
-}
-
-cuTensor * sum(cuTensor *A, cuTensor *B) { return cuTensor::sum(A,B);}
-
-void fill(cuTensor *A, float value) { A->fill(value);}
-
-void print(cuTensor *A) { A->print();}

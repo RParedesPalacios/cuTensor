@@ -12,3 +12,7 @@
 // C=A+B or
 // C+=A+B
 void gpu_sum(float *ptrA, float *ptrB, float *ptrC, long int size, int device, bool inc);
+
+// matrix multiplication of two tensor in gpu
+// C=A*B
+void gpu_mult2D(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int device);
