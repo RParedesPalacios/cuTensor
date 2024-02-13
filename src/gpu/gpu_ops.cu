@@ -17,7 +17,6 @@ __global__ void gpu_sum_(float* a, float *b, float *c, long int size, bool inc){
     }
 }
 
-
 void gpu_sum(float *ptrA, float *ptrB, float *ptrC, long int Asize, long int Bsize, int device, bool inc)
 {
     cudaSetDevice(device);
