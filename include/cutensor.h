@@ -16,16 +16,18 @@ class cuTensor {
         int device;
         float *ptr = nullptr;
     public:
+        string name;
+
         cuTensor();
-        cuTensor(const vector<int> &s, const int dev, float *cpu_ptr);
+        cuTensor(const vector<int> &s, const int dev, const string n);
         cuTensor(const vector<int> &shape);
-        cuTensor(const vector<int> &shape, float *cpu_ptr);
+        cuTensor(const vector<int> &shape, const string n);
         cuTensor(const vector<int> &shape, const int dev);
 
         ~cuTensor();
 
     // Methods
-    cuTensor *clone();
+    cuTensor *clone() const;
     void fill(float value);
     void info();
     void print();
@@ -39,16 +41,3 @@ class cuTensor {
 typedef cuTensor* T;
 typedef vector<int> tshape;
 
-// wrapp OPS
-cuTensor * create(const vector<int> &s, const int dev, float *cpu_ptr);
-cuTensor * create(const vector<int> &s, const int dev);
-cuTensor * create(const vector<int> &s, float *cpu_ptr);
-cuTensor * create(const vector<int> &s);
-cuTensor * clone(cuTensor *A);
-void fill(cuTensor *A, float value);
-void print(cuTensor *A);
-void info(cuTensor *A);
-void reshape(cuTensor *A, const vector<int> &newshape);
-
-cuTensor * sum(cuTensor *A, cuTensor *B);
-cuTensor * mult2D(cuTensor *A, cuTensor *B);

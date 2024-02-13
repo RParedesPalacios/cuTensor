@@ -18,12 +18,15 @@ cuTensor::cuTensor()
     size = 0;
     shape = {};
     ptr = nullptr;
+    name = "";
+    device = 0;
 }
-cuTensor::cuTensor(const vector<int> &s, const int dev, float *cpu_ptr)
+cuTensor::cuTensor(const vector<int> &s, const int dev, const string n)
 {
     ndim = s.size();
     shape = s;
     device = dev;
+    name = n;
     
     size=1;
     for (int i = ndim - 1; i >= 0; i--) {
@@ -32,14 +35,11 @@ cuTensor::cuTensor(const vector<int> &s, const int dev, float *cpu_ptr)
     }
 
     ptr = gpu_create_tensor(device,size);
-    if (cpu_ptr != nullptr)
-        gpu_copy_to_device(device, size, ptr, cpu_ptr);
-
 }
 
-cuTensor::cuTensor(const vector<int> &shape):cuTensor(shape,0,nullptr){}
-cuTensor::cuTensor(const vector<int> &shape, float *cpu_ptr):cuTensor(shape,0,cpu_ptr){}
-cuTensor::cuTensor(const vector<int> &shape, const int dev):cuTensor(shape,dev, nullptr){}
+cuTensor::cuTensor(const vector<int> &shape):cuTensor(shape,0,""){}
+cuTensor::cuTensor(const vector<int> &shape, const string n):cuTensor(shape,0,n){}
+cuTensor::cuTensor(const vector<int> &shape, const int dev):cuTensor(shape,dev, ""){}
 
 cuTensor::~cuTensor()
 {
@@ -49,7 +49,7 @@ cuTensor::~cuTensor()
 ////////////////////////////////////////
 // Methods
 ////////////////////////////////////////
-cuTensor *cuTensor::clone()
+cuTensor *cuTensor::clone() const
 {
     cuTensor *B = new cuTensor(shape, device);
     gpu_copy_(device, size, ptr, B->ptr);
@@ -62,6 +62,8 @@ void cuTensor::fill(float value)
 }
 void cuTensor::info()
 {
+    cout << "--- Tensor Info ---\n";
+    cout << "Tensor name: " << name << endl;
     cout << "Tensor in device: GPU " << device << endl;
     cout << "Tensor shape: ";
     for (int i = 0; i < ndim; i++)
@@ -69,6 +71,7 @@ void cuTensor::info()
         cout << shape[i] << " ";
     }
     cout << endl;
+    cout << "-------------------\n";
 }
 void cuTensor::print()
 {

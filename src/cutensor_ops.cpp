@@ -21,11 +21,22 @@ void print_shape(const char* s, vector<int> shape)
 ///////////////////////////////////////////
 cuTensor * cuTensor::sum(cuTensor *A, cuTensor *B)
 {
-    if (A->size!=B->size) msg("error tensor size mismatch\n");
+    long int As=A->size;
+    long int Bs=B->size;
+    cuTensor *C;
+    
     if (A->device!=B->device) msg("error tensor device mismatch\n");
-
-    cuTensor *C=new cuTensor(A->shape,A->device);
-    gpu_sum(A->ptr,B->ptr,C->ptr,A->size,A->device,false);
+    
+    if (As>Bs) {
+        if (As%Bs!=0) msg("error tensor size mismatch\n");
+        C=new cuTensor(A->shape,A->device);
+        gpu_sum(A->ptr,B->ptr,C->ptr,As,Bs,A->device,false);
+    }
+    else {
+        if (Bs%As!=0) msg("error tensor size mismatch\n");
+        C=new cuTensor(B->shape,B->device);
+        gpu_sum(B->ptr,A->ptr,C->ptr,Bs,As,B->device,false);
+    }
 
     return C;
 }

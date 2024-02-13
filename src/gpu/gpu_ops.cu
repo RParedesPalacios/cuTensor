@@ -18,14 +18,16 @@ __global__ void gpu_sum_(float* a, float *b, float *c, long int size, bool inc){
 }
 
 
-void gpu_sum(float *ptrA, float *ptrB, float *ptrC, long int size, int device, bool inc)
+void gpu_sum(float *ptrA, float *ptrB, float *ptrC, long int Asize, long int Bsize, int device, bool inc)
 {
     cudaSetDevice(device);
+    setDims(Bsize);
 
-    setDims(size);
-
-    gpu_sum_<<<dimGrid,dimBlock>>>(ptrA,ptrB,ptrC,size,inc);
-    check_cuda(cudaDeviceSynchronize(),"gpu_sum_");
+    int m=Asize/Bsize;
+    for(int i=0;i<m;i++){
+        gpu_sum_<<<dimGrid,dimBlock>>>(ptrA+i*Bsize,ptrB,ptrC+i*Bsize,Bsize,inc);
+        check_cuda(cudaDeviceSynchronize(),"gpu_sum_");
+    }
 }
 
 // gpu mult2D C=A*B ussin cuBLAS taking into account that the matrices are stored in row-major order
