@@ -13,5 +13,6 @@ t = T([4, 5, 2])
 t.fill()
 
 # Apply the function to the tensor
+# from GPU to CPU and back to GPU
 t.apply(norm)
 t.print()
