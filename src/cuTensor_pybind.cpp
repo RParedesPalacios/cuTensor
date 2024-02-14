@@ -20,7 +20,7 @@ PYBIND11_MODULE(cuTensor, m) {
         .def("reshape", &cuTensor::reshape)
         .def_static("sum", &cuTensor::sum)
         .def_static("mult2D", &cuTensor::mult2D)
-        
+             
         // Lambdas
         .def("setName", [](cuTensor& self, const std::string& n) {
             self.name = n; // Assuming 'name' is a public member of cuTensor
@@ -33,5 +33,11 @@ PYBIND11_MODULE(cuTensor, m) {
             cuTensor *t=self.clone();
             t->name = n;
             return t;
-        });
+        })
+        // Properties
+        .def_property_readonly("dim", &cuTensor::getDim)
+        .def_property_readonly("device", &cuTensor::getDevice)
+        .def_property_readonly("shape", &cuTensor::getShape)
+        .def_property_readonly("size", &cuTensor::getSize);
+
 }

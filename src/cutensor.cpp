@@ -110,3 +110,19 @@ void cuTensor::reshape(const vector<int> &nshape)
     shape = newshape;
     ndim = shape.size();
 }
+const std::vector<int>& cuTensor::getShape() const 
+{
+    return shape;
+}
+const int cuTensor::getDim() const 
+{
+    return ndim;
+}
+const int cuTensor::getDevice() const 
+{
+    return device;
+}
+const int cuTensor::getSize() const 
+{
+    return size;
+}

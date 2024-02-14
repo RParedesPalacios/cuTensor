@@ -32,6 +32,10 @@ class cuTensor {
     void info();
     void print();
     void reshape(const vector<int> &newshape);
+    const std::vector<int>& getShape() const;
+    const int getDim() const;
+    const int getDevice() const;
+    const int getSize() const;
 
     //OPS
     static cuTensor *sum(cuTensor *A, cuTensor *B);

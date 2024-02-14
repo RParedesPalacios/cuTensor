@@ -14,7 +14,7 @@ void print_shape(const char* s, vector<int> shape)
         cout << shape[i] << " ";
     }
     cout << endl;
-}
+} 
 
 ///////////////////////////////////////////
 // OPS
