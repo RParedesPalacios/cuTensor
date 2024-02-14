@@ -1,7 +1,10 @@
 #include <iostream>
 #include <vector>
 #include "gpu.h"
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
+namespace py = pybind11;
 using namespace std;
 
 typedef vector<int> tshape;
@@ -32,6 +35,7 @@ class cuTensor {
         ~cuTensor();
 
     // Methods
+    int get_ndim();
     cuTensor *clone() const;
     void fill();
     void fill(float value);
@@ -43,7 +47,7 @@ class cuTensor {
     const int getDevice() const;
     const int getSize() const;
     const std::vector<int>& getStride() const;
-
+    void apply(py::function func, py::args args, py::kwargs kwargs);
     //OPS
     static cuTensor *sum(cuTensor *A, cuTensor *B);
     static cuTensor *mult2D(cuTensor *A, cuTensor *B);

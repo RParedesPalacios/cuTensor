@@ -16,6 +16,85 @@ void print_shape(const char* s, vector<int> shape)
     cout << endl;
 } 
 
+/// reshape tensor to a new shape, admiting "-1" e.g. (2,3,5) to (-1,5) should be (6,5) 
+void cuTensor::reshape(const vector<int> &nshape)
+{
+    int newsize = 1;
+    int neg_index = -1;
+    vector<int> newshape=nshape;
+
+    for (int i = 0; i < newshape.size(); i++)
+    {
+        if (newshape[i] == -1)
+        {
+            if (neg_index != -1) msg("error: multiple occurrences of -1 in new shape\n");
+            neg_index = i;
+        }
+        else newsize *= newshape[i];
+    }
+
+    if (neg_index != -1)
+    {
+        if (size % newsize != 0) msg("error: cannot reshape tensor, size mismatch\n");
+        newshape[neg_index] = size / newsize;
+    }
+    else
+    {
+        if (newsize != size) msg("error: cannot reshape tensor, size mismatch\n");
+    }
+
+    shape = newshape;
+    ndim = shape.size();
+    strides.resize(ndim);
+    strides[ndim-1]=1;
+    for (int i = ndim - 2; i >= 0; i--) {
+        strides[i]=strides[i+1]*shape[i+1];
+    }
+}
+
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////
+
+void cuTensor::permute(tshape perm)
+{
+    if (perm.size() != ndim) msg("error: permute must have the same number of dimensions\n");
+
+    // check that in perm are all the dims
+    for (int i = 0; i < ndim; i++)
+    {
+        bool found = false;
+        for (int j = 0; j < ndim; j++)
+        {
+            if (perm[j] == i)
+            {
+                found = true;
+                break;
+            }
+        }
+        if (!found) msg("error: permute must contain all the dimensions\n");
+    }
+
+    // update shape
+    tshape nshape(ndim);
+    for (int i = 0; i < ndim; i++)
+    {
+        nshape[i] = shape[perm[i]];
+    }
+    shape = nshape;
+
+    // new strides
+    tshape nstrides(ndim);
+    nstrides[ndim-1]=1;
+    for (int i = ndim - 2; i >= 0; i--) {
+        nstrides[i]=nstrides[i+1]*shape[i+1];
+    }    
+    gpu_permute_(device, size, ndim, strides.data(), nstrides.data(),perm.data(), ptr);
+
+    strides=nstrides;
+}
+
+
 ///////////////////////////////////////////
 // OPS
 ///////////////////////////////////////////

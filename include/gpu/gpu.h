@@ -21,7 +21,8 @@ int gpu_devices();
 
 float* gpu_create_tensor(int dev,long int size);
 void gpu_delete_tensor(int dev,float* p);
-void gpu_copy_(int device, long int size, float *dst, float *src);
+void gpu_copy_from(int device, long int size, float *src, float *dst);
+void gpu_copy_to(int device, long int size, float *src, float *dst);
 
 void gpu_fill(int device, long int size, float *ptr, float v);
 void gpu_fill_void(int device, long int size, float *ptr);
