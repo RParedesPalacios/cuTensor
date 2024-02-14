@@ -4,17 +4,22 @@
 
 using namespace std;
 
+typedef vector<int> tshape;
 
 void msg(const char *s);
 
 class cuTensor {
-
+    
     private:
         unsigned int ndim;
         unsigned long int size;
         vector<int> shape;
         int device;
         float *ptr = nullptr;
+
+    // I want to add a new property to the class, the stride of the tensor
+    vector<int> strides;
+
     public:
         string name;
 
@@ -28,6 +33,7 @@ class cuTensor {
 
     // Methods
     cuTensor *clone() const;
+    void fill();
     void fill(float value);
     void info();
     void print();
@@ -36,12 +42,15 @@ class cuTensor {
     const int getDim() const;
     const int getDevice() const;
     const int getSize() const;
+    const std::vector<int>& getStride() const;
 
     //OPS
     static cuTensor *sum(cuTensor *A, cuTensor *B);
     static cuTensor *mult2D(cuTensor *A, cuTensor *B);
+    void contiguous(tshape nstride,tshape perm);
+    void permute(tshape perm);
+
 };
 
-typedef cuTensor* T;
-typedef vector<int> tshape;
+
 

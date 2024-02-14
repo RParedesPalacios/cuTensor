@@ -27,11 +27,17 @@ cuTensor::cuTensor(const vector<int> &s, const int dev, const string n)
     shape = s;
     device = dev;
     name = n;
-    
+
     size=1;
     for (int i = ndim - 1; i >= 0; i--) {
         if (shape[i]<0) msg("error negative shape");
         size *= shape[i];
+    }
+    // initialize the stride
+    strides.resize(ndim);
+    strides[ndim-1]=1;
+    for (int i = ndim - 2; i >= 0; i--) {
+        strides[i]=strides[i+1]*shape[i+1];
     }
 
     ptr = gpu_create_tensor(device,size);
@@ -58,26 +64,42 @@ cuTensor *cuTensor::clone() const
 
 void cuTensor::fill(float value)
 {
-    gpu_fill_(device, size, ptr, value);
+    gpu_fill(device, size, ptr, value);
 }
+void cuTensor::fill()
+{
+    gpu_fill_void(device, size, ptr);
+}
+
+void print_shape(tshape shape)
+{
+    cout << "Tensor shape: ";
+    for (int i = 0; i < shape.size(); i++)
+    {
+        cout << shape[i] << " ";
+    }
+    cout << endl;
+}
+
 void cuTensor::info()
 {
     cout << "--- Tensor Info ---\n";
     cout << "Tensor name: " << name << endl;
     cout << "Tensor in device: GPU " << device << endl;
-    cout << "Tensor shape: ";
-    for (int i = 0; i < ndim; i++)
-    {
-        cout << shape[i] << " ";
-    }
-    cout << endl;
-    cout << "-------------------\n";
+    print_shape(shape);
 }
 void cuTensor::print()
 {
     info();
-    gpu_print_(device, size, ptr);
+    float *ptr2 = new float[size];
+    gpu_copy_(device, size, ptr, ptr2);
+    for (int i = 0; i < size; i++)
+    {
+        cout << fixed << setprecision(4) << ptr2[i] << " ";
+    }   
+    //gpu_print_(device, size, ptr);
     cout << endl;
+    delete[] ptr2;
 }
 
 /// reshape tensor to a new shape, admiting "-1" e.g. (2,3,5) to (-1,5) should be (6,5) 
@@ -109,10 +131,59 @@ void cuTensor::reshape(const vector<int> &nshape)
 
     shape = newshape;
     ndim = shape.size();
+    strides.resize(ndim);
+    strides[ndim-1]=1;
+    for (int i = ndim - 2; i >= 0; i--) {
+        strides[i]=strides[i+1]*shape[i+1];
+    }
 }
+
+
+void cuTensor::permute(tshape perm)
+{
+    if (perm.size() != ndim) msg("error: permute must have the same number of dimensions\n");
+
+    // check that in perm are all the dims
+    for (int i = 0; i < ndim; i++)
+    {
+        bool found = false;
+        for (int j = 0; j < ndim; j++)
+        {
+            if (perm[j] == i)
+            {
+                found = true;
+                break;
+            }
+        }
+        if (!found) msg("error: permute must contain all the dimensions\n");
+    }
+
+    // update shape
+    tshape nshape(ndim);
+    for (int i = 0; i < ndim; i++)
+    {
+        nshape[i] = shape[perm[i]];
+    }
+    shape = nshape;
+
+    // new strides
+    tshape nstrides(ndim);
+    nstrides[ndim-1]=1;
+    for (int i = ndim - 2; i >= 0; i--) {
+        nstrides[i]=nstrides[i+1]*shape[i+1];
+    }    
+    gpu_permute_(device, size, ndim, strides.data(), nstrides.data(),perm.data(), ptr);
+
+    strides=nstrides;
+}
+
 const std::vector<int>& cuTensor::getShape() const 
 {
     return shape;
+}
+const std::vector<int>& cuTensor::getStride() const 
+{
+    return strides;
 }
 const int cuTensor::getDim() const 
 {
