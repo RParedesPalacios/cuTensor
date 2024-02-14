@@ -34,7 +34,7 @@ PYBIND11_MODULE(cuTensor, m) {
 
     py::class_<cuTensor>(m, "cuTensor")
         .def(py::init<>())
-        .def(py::init<const std::vector<int>&, int, string>(),
+        .def(py::init<const tshape&, int, string>(),
             py::arg("shape"), py::arg("device") = 0,py::arg("name") = std::string())
         .def("fill", (void (cuTensor::*)()) &cuTensor::fill)
         .def("fill", (void (cuTensor::*)(float)) &cuTensor::fill, py::arg("value"))
@@ -43,6 +43,9 @@ PYBIND11_MODULE(cuTensor, m) {
         .def("reshape", &cuTensor::reshape)       
         .def("permute", &cuTensor::permute)
         .def("apply", &cuTensor::apply)
+        .def("inv", &cuTensor::inv)
+        .def("pow", &cuTensor::pow)
+
         // static
         .def_static("sum", &cuTensor::sum)
         .def_static("mult2D", &cuTensor::mult2D)
@@ -73,6 +76,67 @@ PYBIND11_MODULE(cuTensor, m) {
         .def_property_readonly("device", &cuTensor::getDevice)
         .def_property_readonly("shape", &cuTensor::getShape)
         .def_property_readonly("stride", &cuTensor::getStride)
-        .def_property_readonly("size", &cuTensor::getSize);
+        .def_property_readonly("size", &cuTensor::getSize)
+
+        // operator overloading
+        .def("__str__", &cuTensor::tostr)
+        .def("__add__", [](cuTensor& t1, cuTensor& t2) {
+            cuTensor *t = cuTensor::sum(&t1, &t2);
+            return t;
+        })
+        .def("__sub__", [](cuTensor& t1, cuTensor& t2) {
+            cuTensor *t = cuTensor::mult(&t2, -1);
+            cuTensor *t3 = cuTensor::sum(&t1, cuTensor::mult(&t2, -1));
+            delete t;
+            return t3;
+        })
+        .def("__add__", [](cuTensor& t1, float s) {
+            cuTensor *t = cuTensor::sumf(&t1, s);
+            return t;
+        })
+        .def("__radd__", [](cuTensor& t1, float s) {
+            cuTensor *t = cuTensor::sumf(&t1, s);
+            return t;
+        })
+        .def("__sub__", [](cuTensor& t1, float s) {
+            cuTensor *t = cuTensor::sumf(&t1, -s);
+            return t;
+        })
+        .def("__rsub__", [](cuTensor& t1, float s) {
+            cuTensor *t = cuTensor::mult(&t1, -1);
+            cuTensor *t2 = cuTensor::sumf(t, s);
+            delete t;
+            return t2;
+        })
+        .def("__neg__", [](cuTensor& t1) {
+            cuTensor *t = cuTensor::mult(&t1, -1);
+            return t;
+        })
+        .def("__mul__", [](cuTensor& t1, float s) {
+            cuTensor *t = cuTensor::mult(&t1, s);
+            return t;
+        })
+        .def("__rmul__", [](cuTensor& t1, float s) {
+            cuTensor *t = cuTensor::mult(&t1, s);
+            return t;
+        })
+        .def("__mul__", [](cuTensor& t1, cuTensor& t2) {
+            cuTensor *t = cuTensor::mult2D(&t1, &t2);
+            return t;
+        })
+        .def("__truediv__", [](cuTensor& t1, float s) {
+            cuTensor *t = cuTensor::mult(&t1, 1.0/s);
+            return t;
+        })
+        .def("__rtruediv__", [](cuTensor& t1, float s) {
+            cuTensor *t = t1.inv();
+            cuTensor *t2 = cuTensor::mult(t, s);
+            delete t;
+            return t2;
+        })
+        .def("__pow__", [](cuTensor& t1, float s) {
+            cuTensor *t =t1.pow(s);
+            return t;
+        });
 
 }

@@ -5,23 +5,12 @@
 
 using namespace std;
 
-
-void print_shape(const char* s, vector<int> shape)
-{
-    cout << s << " : ";
-    for (int i = 0; i < shape.size(); i++)
-    {
-        cout << shape[i] << " ";
-    }
-    cout << endl;
-} 
-
 /// reshape tensor to a new shape, admiting "-1" e.g. (2,3,5) to (-1,5) should be (6,5) 
-void cuTensor::reshape(const vector<int> &nshape)
+void cuTensor::reshape(const tshape &nshape)
 {
     int newsize = 1;
     int neg_index = -1;
-    vector<int> newshape=nshape;
+    tshape newshape=nshape;
 
     for (int i = 0; i < newshape.size(); i++)
     {
@@ -120,6 +109,13 @@ cuTensor * cuTensor::sum(cuTensor *A, cuTensor *B)
     return C;
 }
 
+cuTensor * cuTensor::sumf(cuTensor *A, float s)
+{
+    cuTensor *C=new cuTensor(A->shape,A->device);
+    gpu_sumf(A->ptr,C->ptr,A->size,s,A->device);
+    return C;
+}
+
 void find_match_dims(tshape a, tshape b, int &apos, int &bpos, int &match )
 {
     int i,j;
@@ -180,5 +176,26 @@ cuTensor * cuTensor::mult2D(cuTensor *A, cuTensor *B)
     A->reshape(As);
     B->reshape(Bs);
 
+    return C;
+}
+
+cuTensor * cuTensor::mult(cuTensor *A, float s)
+{
+    cuTensor *C=new cuTensor(A->shape,A->device);
+    gpu_mult(A->ptr,C->ptr,A->size,s,A->device);
+    return C;
+}
+
+cuTensor * cuTensor::inv()
+{
+    cuTensor *C=new cuTensor(shape,device);
+    gpu_inv(ptr,C->ptr,size,device);
+    return C;
+}
+
+cuTensor * cuTensor::pow(float s)
+{
+    cuTensor *C=new cuTensor(shape,device);
+    gpu_pow(ptr,C->ptr,size,s,device);
     return C;
 }

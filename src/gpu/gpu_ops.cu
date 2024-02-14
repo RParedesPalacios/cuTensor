@@ -29,6 +29,22 @@ void gpu_sum(float *ptrA, float *ptrB, float *ptrC, long int Asize, long int Bsi
     }
 }
 
+__global__ void gpu_sumf_(float* a, float *c, long int size, float s, int device){
+    long int thread_id_x = threadIdx.x+blockIdx.x*blockDim.x;
+
+    if (thread_id_x < size){
+        c[thread_id_x]=a[thread_id_x]+s;
+               
+    }
+}
+void gpu_sumf(float *ptrA, float *ptrC, long int size, float s, int device)
+{
+    cudaSetDevice(device);
+    setDims(size);
+    gpu_sumf_<<<dimGrid,dimBlock>>>(ptrA,ptrC,size,s,device);
+    check_cuda(cudaDeviceSynchronize(),"gpu_sumf_");
+}
+
 // gpu mult2D C=A*B ussin cuBLAS taking into account that the matrices are stored in row-major order
 void gpu_mult2D(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int device) // m=A0,n=A1,k=B1
 {
@@ -38,4 +54,56 @@ void gpu_mult2D(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int 
     float beta = 0.0;
 
     check_cublas(cublasSgemm(hcublas[device], CUBLAS_OP_N, CUBLAS_OP_N, k, m, n, &alpha, ptrB, k, ptrA, n, &beta, ptrC, k), "cublasSgemm");
+}
+
+// gpu scalar multiplication
+__global__ void gpu_mult_(float *a, float *c, long int size, float s){
+    long int thread_id_x = threadIdx.x+blockIdx.x*blockDim.x;
+
+    if (thread_id_x < size){
+        c[thread_id_x]=a[thread_id_x]*s;
+    }
+}
+
+void gpu_mult(float *ptrA, float *ptrC,long int size,float s,int device)
+{
+    cudaSetDevice(device);
+    setDims(size);
+    gpu_mult_<<<dimGrid,dimBlock>>>(ptrA,ptrC,size,s);
+    check_cuda(cudaDeviceSynchronize(),"gpu_mult_");
+}
+
+__global__ void gpu_inv_(float *a, float *c, long int size){
+    long int thread_id_x = threadIdx.x+blockIdx.x*blockDim.x;
+
+    if (thread_id_x < size){
+        c[thread_id_x]=1.0/a[thread_id_x];
+    }
+}
+
+void gpu_inv(float *ptrA, float *ptrC, long int size, int device)
+{
+    cudaSetDevice(device);
+    setDims(size);
+    
+    gpu_inv_<<<dimGrid,dimBlock>>>(ptrA,ptrC,size);    
+    check_cuda(cudaDeviceSynchronize(),"gpu_inv_");
+
+}
+
+
+__global__ void gpu_pow_(float *a, float *c, long int size, float s){
+    long int thread_id_x = threadIdx.x+blockIdx.x*blockDim.x;
+
+    if (thread_id_x < size){
+        c[thread_id_x]=pow(a[thread_id_x],s);
+    }
+}
+
+void gpu_pow(float *ptrA, float *ptrC, long int size, float s, int device)
+{
+    cudaSetDevice(device);
+    setDims(size);
+    gpu_pow_<<<dimGrid,dimBlock>>>(ptrA,ptrC,size,s);
+    check_cuda(cudaDeviceSynchronize(),"gpu_pow_");
 }

@@ -13,6 +13,16 @@
 // C+=A+B
 void gpu_sum(float *ptrA, float *ptrB, float *ptrC, long int Asize, long int Bsize,int device, bool inc);
 
+// sum of tensor and escalar in gpu
+void gpu_sumf(float *ptrA, float *ptrC, long int size, float s, int device);
+
 // matrix multiplication of two tensor in gpu
 // C=A*B
 void gpu_mult2D(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int device);
+
+// matrix multiplication escalar * tensor in gpu
+void gpu_mult(float *ptrA, float *ptrC,long int size,float s,int device);
+
+
+void gpu_inv(float *ptrA, float * ptrC, long int size, int device);
+void gpu_pow(float *ptrA, float * ptrC, long int size, float s, int device);

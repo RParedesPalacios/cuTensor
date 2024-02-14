@@ -21,7 +21,7 @@ cuTensor::cuTensor()
     name = "";
     device = 0;
 }
-cuTensor::cuTensor(const vector<int> &s, const int dev, const string n)
+cuTensor::cuTensor(const tshape &s, const int dev, const string n)
 {
     ndim = s.size();
     shape = s;
@@ -43,9 +43,9 @@ cuTensor::cuTensor(const vector<int> &s, const int dev, const string n)
     ptr = gpu_create_tensor(device,size);
 }
 
-cuTensor::cuTensor(const vector<int> &shape):cuTensor(shape,0,""){}
-cuTensor::cuTensor(const vector<int> &shape, const string n):cuTensor(shape,0,n){}
-cuTensor::cuTensor(const vector<int> &shape, const int dev):cuTensor(shape,dev, ""){}
+cuTensor::cuTensor(const tshape &shape):cuTensor(shape,0,""){}
+cuTensor::cuTensor(const tshape &shape, const string n):cuTensor(shape,0,n){}
+cuTensor::cuTensor(const tshape &shape, const int dev):cuTensor(shape,dev, ""){}
 
 cuTensor::~cuTensor()
 {
@@ -75,22 +75,18 @@ void cuTensor::fill()
     gpu_fill_void(device, size, ptr);
 }
 
-void print_shape(tshape shape)
+void cuTensor::info()
 {
+    cout << "--- Tensor Info ---\n";
+    cout << "Tensor name: " << name << endl;
+    cout << "Tensor in device: GPU " << device << endl;    
+    
     cout << "Tensor shape: ";
     for (int i = 0; i < shape.size(); i++)
     {
         cout << shape[i] << " ";
     }
     cout << endl;
-}
-
-void cuTensor::info()
-{
-    cout << "--- Tensor Info ---\n";
-    cout << "Tensor name: " << name << endl;
-    cout << "Tensor in device: GPU " << device << endl;
-    print_shape(shape);    
     cout << "Tensor size: " << size << endl;
 }
 void cuTensor::print()
@@ -107,12 +103,33 @@ void cuTensor::print()
     delete[] ptr2;
 }
 
+string shape_to_string(const tshape &shape)
+{
+    string str = "";
+    for (int i = 0; i < shape.size(); i++)
+    {
+        str += to_string(shape[i]) + " ";
+    }
+    return str;
+}
 
-const std::vector<int>& cuTensor::getShape() const 
+string cuTensor::tostr()
+{
+    string str = ""; 
+    str = str + "--- Tensor Info ---\n";
+    str = str + "Tensor name: " + name + "\n";
+    str = str + "Tensor in device: GPU " + to_string(device) + "\n";
+    str = str + "Tensor shape: " + shape_to_string(shape) + "\n";
+    str = str + "Tensor size: " + to_string(size) + "\n";
+    return str;
+}
+
+
+const tshape& cuTensor::getShape() const 
 {
     return shape;
 }
-const std::vector<int>& cuTensor::getStride() const 
+const tshape& cuTensor::getStride() const 
 {
     return strides;
 }
