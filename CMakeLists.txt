@@ -18,6 +18,3 @@ set_target_properties(cuTensor PROPERTIES
                       CUDA_SEPARABLE_COMPILATION ON)
 
 target_link_libraries(cuTensor PRIVATE CUDA::cublas pybind11::pybind11)
-
-# If necessary, set specific CUDA architectures
-# target_compile_options(cuTensor PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-arch=sm_XX>)
