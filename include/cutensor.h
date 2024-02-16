@@ -3,6 +3,7 @@
 #include "gpu.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/numpy.h>
 
 namespace py = pybind11;
 using namespace std;
@@ -27,6 +28,7 @@ class cuTensor {
         string name;
 
         cuTensor();
+        cuTensor(const tshape &shape,float *ptr);
         cuTensor(const tshape &s, const int dev, const string n);
         cuTensor(const tshape &shape);
         cuTensor(const tshape &shape, const string n);
@@ -49,6 +51,7 @@ class cuTensor {
     const int getSize() const;
     const tshape& getStride() const;
     void apply(py::function func, py::args args, py::kwargs kwargs);
+    
     //OPS
     static cuTensor *sum(cuTensor *A, cuTensor *B);
     static cuTensor *sumf(cuTensor *A, float s);
@@ -56,9 +59,10 @@ class cuTensor {
     static cuTensor *mult(cuTensor *A, float s);
     cuTensor *inv();
     cuTensor *pow(float s);
-    void contiguous(tshape nstride,tshape perm);
-    void permute(tshape perm);
 
+    void contiguous(tshape nstride,tshape perm);
+    void permute_(tshape perm);
+    cuTensor* permute(tshape perm);
 };
 
 

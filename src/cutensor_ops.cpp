@@ -44,8 +44,14 @@ void cuTensor::reshape(const tshape &nshape)
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
+cuTensor* cuTensor::permute(tshape perm)
+{
+    cuTensor *C=clone();
+    C->permute_(perm);
+    return C;
+}
 
-void cuTensor::permute(tshape perm)
+void cuTensor::permute_(tshape perm)
 {
     if (perm.size() != ndim) msg("error: permute must have the same number of dimensions\n");
 

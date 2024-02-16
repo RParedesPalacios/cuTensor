@@ -4,7 +4,6 @@
 #include "cutensor.h" // Adjust this include path as necessary
 
 namespace py = pybind11;
-// Define your function type
 
 void cuTensor::apply(py::function func, py::args args, py::kwargs kwargs) {
         // Copy tensor data to CPU memory
@@ -21,11 +20,25 @@ void cuTensor::apply(py::function func, py::args args, py::kwargs kwargs) {
         gpu_copy_to(device, size, (float *)data_array.mutable_data(), ptr);
 
         delete[] cpu_data;
+}
 
-    }
+
+
+static cuTensor* from_numpy(const py::array_t<float>& arr) {
+        py::buffer_info buf = arr.request();
+        std::vector<int> shape;
+        for (auto dim : buf.shape) {
+            shape.push_back(static_cast<int>(dim));
+        }
+        float *ptr = static_cast<float *>(buf.ptr);
+        return new cuTensor(shape, ptr);
+}
+
+
 
 PYBIND11_MODULE(cuTensor, m) {  
-    // Call gpu_init() directly here to ensure it runs on module import
+    // Call gpu_init() directly 
+     to ensure it runs on module import
     gpu_init();
 
     //m.def("gpu_init", &gpu_init); // If you also want to expose it to Python
@@ -34,8 +47,11 @@ PYBIND11_MODULE(cuTensor, m) {
 
     py::class_<cuTensor>(m, "cuTensor")
         .def(py::init<>())
+        
+        // Constructor with shape, device, and name arguments
         .def(py::init<const tshape&, int, string>(),
-            py::arg("shape"), py::arg("device") = 0,py::arg("name") = std::string())
+            py::arg("shape"), py::arg("device") = 0, py::arg("name") = std::string())
+                
         .def("fill", (void (cuTensor::*)()) &cuTensor::fill)
         .def("fill", (void (cuTensor::*)(float)) &cuTensor::fill, py::arg("value"))
         .def("info", &cuTensor::info)
@@ -43,13 +59,15 @@ PYBIND11_MODULE(cuTensor, m) {
         .def("reshape", &cuTensor::reshape)       
         .def("permute", &cuTensor::permute)
         .def("apply", &cuTensor::apply)
+        .def("apply", &cuTensor::apply)
         .def("inv", &cuTensor::inv)
         .def("pow", &cuTensor::pow)
 
         // static
         .def_static("sum", &cuTensor::sum)
         .def_static("mult2D", &cuTensor::mult2D)
-                     
+        .def_static("from_numpy", from_numpy, py::arg("array"))
+       
         // Lambdas
         .def("setName", [](cuTensor& self, const std::string& n) {
             self.name = n; // Assuming 'name' is a public member of cuTensor
@@ -68,7 +86,7 @@ PYBIND11_MODULE(cuTensor, m) {
                 printf("transpose only for 2D Tensor, use permute instead\n");
                 exit(1);
             }
-            self.permute({1,0});
+            return self.permute({1,0});
         })
         
         // Properties
@@ -80,6 +98,7 @@ PYBIND11_MODULE(cuTensor, m) {
 
         // operator overloading
         .def("__str__", &cuTensor::tostr)
+        .def("__len__", &cuTensor::getSize)
         .def("__add__", [](cuTensor& t1, cuTensor& t2) {
             cuTensor *t = cuTensor::sum(&t1, &t2);
             return t;

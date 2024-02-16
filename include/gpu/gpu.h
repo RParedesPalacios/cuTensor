@@ -31,3 +31,4 @@ void gpu_print_(int device, long int size, float *ptr);
 
 void gpu_permute_(int device, long int size, int dim, int *strides, int *nstrides,int *perm, float *ptr);
 
+void gpu_div(int device, long int size, float *A, float s);

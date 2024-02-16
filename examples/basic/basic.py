@@ -1,21 +1,14 @@
 from cuTensor import cuTensor as T
+import numpy as np
 
-t = T([4, 5, 2])
-t.fill()
-t.info()
+# Create a tensor
+a = T.from_numpy(np.random.rand(3, 10, 2))
+a.print()
 
-t2= T([2, 5, 2])
-t2.fill(2)
-t2.print()
+b= T.from_numpy(np.random.rand(3, 10, 2))
+b.print()
 
-t3=t2**4
-t3.print()
+b=b.permute([1,2,0])
 
-t4=t3-t2
-t4.print()
-
-t4=t4-2
-t4.print()
-
-t4=2-t4
-t4.print()
+c=a*b
+c.print()

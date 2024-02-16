@@ -9,6 +9,15 @@ void msg(const char *s)
     printf("%s",s);
     exit(1);
 }
+
+void print_shape(const tshape &shape)
+{
+    for (int i = 0; i < shape.size(); i++)
+    {
+        cout << shape[i] << " ";
+    }
+    cout << endl;
+}
 ////////////////////////////////////////
 // Constructor and Destructor
 ////////////////////////////////////////
@@ -46,6 +55,10 @@ cuTensor::cuTensor(const tshape &s, const int dev, const string n)
 cuTensor::cuTensor(const tshape &shape):cuTensor(shape,0,""){}
 cuTensor::cuTensor(const tshape &shape, const string n):cuTensor(shape,0,n){}
 cuTensor::cuTensor(const tshape &shape, const int dev):cuTensor(shape,dev, ""){}
+cuTensor::cuTensor(const tshape &shape,float *cpu_ptr):cuTensor(shape,0,"")
+{
+  gpu_copy_to(device,size,cpu_ptr,ptr);
+}
 
 cuTensor::~cuTensor()
 {
