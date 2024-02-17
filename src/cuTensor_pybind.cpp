@@ -41,8 +41,9 @@ static cuTensor* from_numpy(const py::array_t<float>& arr) {
 
 PYBIND11_MODULE(cuTensor, m) {  
     // Call gpu_init() directly to ensure it runs on module import
-    gpu_init();
+    gpu_init(); 
 
+    
     //m.def("gpu_init", &gpu_init); // If you also want to expose it to Python
     m.def("hw_info", &hw_info);
     m.attr("__version__") = version;

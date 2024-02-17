@@ -3,6 +3,7 @@
 
 ```console
 sudo apt install nvidia-cuda-toolkit
+sudo apt install cmake
 
 pip install pybind11
 
