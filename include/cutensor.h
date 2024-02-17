@@ -28,11 +28,11 @@ class cuTensor {
         string name;
 
         cuTensor();
-        cuTensor(const tshape &shape,float *ptr);
         cuTensor(const tshape &s, const int dev, const string n);
         cuTensor(const tshape &shape);
         cuTensor(const tshape &shape, const string n);
         cuTensor(const tshape &shape, const int dev);
+        cuTensor(const tshape &shape, float *ptr, const int dev, const string n);
 
         ~cuTensor();
 

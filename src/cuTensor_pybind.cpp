@@ -27,14 +27,14 @@ void cuTensor::apply(py::function func, py::args args, py::kwargs kwargs) {
 
 
 // create tensor from numpy array
-static cuTensor* from_numpy(const py::array_t<float>& arr) {
+static cuTensor* from_numpy(const py::array_t<float>& arr, const int device=0, const string name="") {
         py::buffer_info buf = arr.request();
         std::vector<int> shape;
         for (auto dim : buf.shape) {
             shape.push_back(static_cast<int>(dim));
         }
         float *ptr = static_cast<float *>(buf.ptr);
-        return new cuTensor(shape, ptr);
+        return new cuTensor(shape, ptr, device, name);
 }
 
 
@@ -65,8 +65,8 @@ PYBIND11_MODULE(cuTensor, m) {
 
         // static
         .def_static("mm", &cuTensor::mult2D)
-        .def_static("from_numpy", from_numpy, py::arg("array"))
-        .def_static("from_array", from_numpy, py::arg("array"))
+        .def_static("from_numpy", from_numpy, py::arg("array"), py::arg("device")=0, py::arg("name")="")
+        .def_static("from_array", from_numpy, py::arg("array"), py::arg("device")=0, py::arg("name")="")
 
         // Lambdas
         .def("setName", [](cuTensor& self, const std::string& n) {
