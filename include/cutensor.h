@@ -57,6 +57,8 @@ class cuTensor {
     static cuTensor *sumf(cuTensor *A, float s);
     static cuTensor *mult2D(cuTensor *A, cuTensor *B);
     static cuTensor *mult(cuTensor *A, float s);
+    static cuTensor *elementwise_product(cuTensor *A, cuTensor *B);
+    
     cuTensor *inv();
     cuTensor *pow(float s);
 

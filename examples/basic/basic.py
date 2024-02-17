@@ -1,14 +1,21 @@
+import cuTensor
 from cuTensor import cuTensor as T
 import numpy as np
 
+print(cuTensor.__version__)
+
 # Create a tensor
-a = T.from_numpy(np.random.rand(3, 10, 2))
-a.print()
+a = T([2,3])
+a.fill()
 
-b= T.from_numpy(np.random.rand(3, 10, 2))
-b.print()
+a.print_array()
 
-b=b.permute([1,2,0])
+b = T([2,3])
+b.fill()
+b.print_array()
 
-c=a*b
-c.print()
+c=T.mm(b,a.transpose())
+print(c)
+c.print_array()
+
+

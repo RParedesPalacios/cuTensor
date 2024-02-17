@@ -192,6 +192,16 @@ cuTensor * cuTensor::mult(cuTensor *A, float s)
     return C;
 }
 
+cuTensor * cuTensor::elementwise_product(cuTensor *A, cuTensor *B)
+{
+    if (A->size!=B->size) msg("error tensor size mismatch\n");
+    if (A->device!=B->device) msg("error tensor device mismatch\n");
+
+    cuTensor *C=new cuTensor(A->shape,A->device);
+    gpu_elementwise_product(A->ptr,B->ptr,C->ptr,A->size,A->device);
+    return C;
+}
+
 cuTensor * cuTensor::inv()
 {
     cuTensor *C=new cuTensor(shape,device);

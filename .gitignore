@@ -2,3 +2,4 @@ build/*
 .vscode/*.json
 examples/basic/run
 compile.sh
+token.txt

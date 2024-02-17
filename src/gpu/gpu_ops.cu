@@ -56,6 +56,22 @@ void gpu_mult2D(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int 
     check_cublas(cublasSgemm(hcublas[device], CUBLAS_OP_N, CUBLAS_OP_N, k, m, n, &alpha, ptrB, k, ptrA, n, &beta, ptrC, k), "cublasSgemm");
 }
 
+__global__ void gpu_elementwise_product_(float *a, float *b, float *c, long int size){
+    long int thread_id_x = threadIdx.x+blockIdx.x*blockDim.x;
+
+    if (thread_id_x < size){
+        c[thread_id_x]=a[thread_id_x]*b[thread_id_x];
+    }
+}   
+
+void gpu_elementwise_product(float *ptrA, float *ptrB, float *ptrC, long int size, int device)
+{
+    cudaSetDevice(device);
+    setDims(size);
+    gpu_elementwise_product_<<<dimGrid,dimBlock>>>(ptrA,ptrB,ptrC,size);
+    check_cuda(cudaDeviceSynchronize(),"elementwise_product");
+}
+
 // gpu scalar multiplication
 __global__ void gpu_mult_(float *a, float *c, long int size, float s){
     long int thread_id_x = threadIdx.x+blockIdx.x*blockDim.x;

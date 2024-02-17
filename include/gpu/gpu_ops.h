@@ -23,6 +23,7 @@ void gpu_mult2D(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int 
 // matrix multiplication escalar * tensor in gpu
 void gpu_mult(float *ptrA, float *ptrC,long int size,float s,int device);
 
+void gpu_elementwise_product(float *ptrA, float *ptrB, float *ptrC, long int size, int device);
 
 void gpu_inv(float *ptrA, float * ptrC, long int size, int device);
 void gpu_pow(float *ptrA, float * ptrC, long int size, float s, int device);

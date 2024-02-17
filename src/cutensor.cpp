@@ -75,6 +75,7 @@ int cuTensor::get_ndim() {
 cuTensor *cuTensor::clone() const
 {
     cuTensor *B = new cuTensor(shape, device);
+    B->name=name;
     gpu_copy_to(device, size, ptr, B->ptr);
     return B;
 }
@@ -88,9 +89,9 @@ void cuTensor::fill()
     gpu_fill_void(device, size, ptr);
 }
 
-void cuTensor::info()
+void cuTensor::print()
 {
-    cout << "--- Tensor Info ---\n";
+    cout << "------------------------\n";
     cout << "Tensor name: " << name << endl;
     cout << "Tensor in device: GPU " << device << endl;    
     
@@ -101,18 +102,19 @@ void cuTensor::info()
     }
     cout << endl;
     cout << "Tensor size: " << size << endl;
+    cout << "------------------------\n";
 }
-void cuTensor::print()
+void cuTensor::info()
 {
-    info();
+    cout << "---- Tensor content ----\n";
     float *ptr2 = new float[size];
     gpu_copy_from(device, size, ptr, ptr2);
     for (int i = 0; i < size; i++)
     {
         cout << fixed << setprecision(4) << ptr2[i] << " ";
     }   
-    //gpu_print_(device, size, ptr);
-    cout << endl;
+    //gpu_print_(device, size, ptr); 
+    cout << endl << "------------------------\n";
     delete[] ptr2;
 }
 
@@ -129,11 +131,12 @@ string shape_to_string(const tshape &shape)
 string cuTensor::tostr()
 {
     string str = ""; 
-    str = str + "--- Tensor Info ---\n";
+    str = str + "------------------------\n";
     str = str + "Tensor name: " + name + "\n";
     str = str + "Tensor in device: GPU " + to_string(device) + "\n";
     str = str + "Tensor shape: " + shape_to_string(shape) + "\n";
     str = str + "Tensor size: " + to_string(size) + "\n";
+    str = str + "------------------------\n";
     return str;
 }
 
