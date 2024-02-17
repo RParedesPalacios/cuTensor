@@ -16,3 +16,10 @@ python setup.py build_ext --inplace
 pip install .
 
 ```
+
+## Test the installation
+```console
+python -c "import cuTensor"
+
+```
+

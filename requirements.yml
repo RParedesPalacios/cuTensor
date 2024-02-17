@@ -8,3 +8,4 @@ dependencies:
   - gxx_linux-64  # or gcc_linux-64 if you prefer GCC
   - pybind11    # Pybind11 for creating Python bindings
   - cudatoolkit # Nvidia CUDA Toolkit for GPU support
+  - cudatoolkit-dev
