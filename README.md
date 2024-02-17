@@ -19,7 +19,6 @@ pip install .
 
 ## Test the installation
 ```console
-
 python -c "import cuTensor"
 
 ```
