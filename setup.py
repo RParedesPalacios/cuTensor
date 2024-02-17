@@ -28,9 +28,9 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', '--build', '.', '--target', ext.name] + build_args, cwd=self.build_temp)
 
 setup(
-    name='cudaTensor',
+    name='cuTensor',
     version='0.1',
-    author='Your Name',
+    author='Roberto Paredes',
     description='Python bindings for cuTensor C++/CUDA library',
     long_description='',
     ext_modules=[CMakeExtension('cuTensor', '.')],

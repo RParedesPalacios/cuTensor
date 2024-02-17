@@ -14,6 +14,8 @@ add_library(cuTensor SHARED ${CPP_SOURCES} ${CUDA_SOURCES})
 set_target_properties(cuTensor PROPERTIES OUTPUT_NAME "cuTensor")
 
 set_target_properties(cuTensor PROPERTIES
+                      PREFIX ""
+                      OUTPUT_NAME "cuTensor"
                       POSITION_INDEPENDENT_CODE ON
                       CUDA_SEPARABLE_COMPILATION ON)
 
