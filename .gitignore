@@ -4,3 +4,4 @@ examples/basic/run
 compile.sh
 token.txt
 cuTensor.so
+cuTensor.egg-info/*
