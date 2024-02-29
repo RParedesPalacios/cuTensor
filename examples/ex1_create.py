@@ -41,7 +41,7 @@ b = T.from_array(np.random.rand(2,3), name="b", device=0)
 c = b.clone("c")
 print(c)
 
-# getname properties of tensor
+# get properties of tensor
 print(b.name)
 print(b.device)
 print(b.shape)
