@@ -13,7 +13,7 @@ b.fill(1)
 print(b)
 b.print_array()
 
-b.apply(transform) # apply function on CPU and copy bakc to GPU
+b.apply(transform) # apply function on CPU and copy back to GPU
 b.print_array()
 
 
