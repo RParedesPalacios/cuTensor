@@ -35,7 +35,7 @@ c=a*b
 
 c=2*a
 
-# division, elementwise product
+# division, elementwise division
 c=a/b # the same:
 c=a*(1/b)
 
