@@ -37,7 +37,11 @@ static cuTensor* from_numpy(const py::array_t<float>& arr, const int device=0, c
         return new cuTensor(shape, ptr, device, name);
 }
 
-
+// create a tensor from a numpy array loaded from a file
+static cuTensor* from_file(const string filename, const int device=0, const string name="") {
+    py::array_t<float> arr = py::reinterpret_borrow<py::array_t<float>>(py::module::import("numpy").attr("load")(filename));
+    return from_numpy(arr, device, name);
+}
 
 PYBIND11_MODULE(cuTensor, m) {  
     // Call gpu_init() directly to ensure it runs on module import
@@ -67,6 +71,8 @@ PYBIND11_MODULE(cuTensor, m) {
         .def_static("mm", &cuTensor::mult2D)
         .def_static("from_numpy", from_numpy, py::arg("array"), py::arg("device")=0, py::arg("name")="")
         .def_static("from_array", from_numpy, py::arg("array"), py::arg("device")=0, py::arg("name")="")
+        .def_static("from_file", from_file, py::arg("filename"), py::arg("device")=0, py::arg("name")="")
+
 
         // Lambdas
         .def("setName", [](cuTensor& self, const std::string& n) {
@@ -94,6 +100,7 @@ PYBIND11_MODULE(cuTensor, m) {
         .def_property_readonly("shape", &cuTensor::getShape)
         .def_property_readonly("stride", &cuTensor::getStride)
         .def_property_readonly("size", &cuTensor::getSize)
+        .def_property_readonly("name", &cuTensor::getName)
 
         // operator overloading
         .def("__str__", &cuTensor::tostr)
@@ -151,6 +158,12 @@ PYBIND11_MODULE(cuTensor, m) {
         })
         .def("__truediv__", [](cuTensor& t1, float s) {
             cuTensor *t = cuTensor::mult(&t1, 1.0/s);
+            return t;
+        }) 
+        .def("__truediv__", [](cuTensor& t1, cuTensor& t2) {
+            cuTensor *aux = t2.inv();
+            cuTensor *t = cuTensor::elementwise_product(&t1, aux);
+            delete aux;
             return t;
         })
         .def("__rtruediv__", [](cuTensor& t1, float s) {

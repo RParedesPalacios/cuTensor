@@ -49,7 +49,8 @@ class cuTensor {
     const int getDim() const;
     const int getDevice() const;
     const int getSize() const;
-    const tshape& getStride() const;
+    const tshape& getStride() const;    
+    const string getName() const;
     void apply(py::function func, py::args args, py::kwargs kwargs);
     
     //OPS

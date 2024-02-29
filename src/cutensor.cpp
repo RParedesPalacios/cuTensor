@@ -162,3 +162,7 @@ const int cuTensor::getSize() const
 {
     return size;
 }
+const string cuTensor::getName() const 
+{
+    return name;
+}
