@@ -4,6 +4,10 @@
 Provides an python interface to tensors in GPU. 
 Personal project just to learn how to manage tensors, how to provide a python interface with pybind etc.
 
+## TODO
+
+Easier installation with just "pip install"
+
 ## Install
 
 ```console
