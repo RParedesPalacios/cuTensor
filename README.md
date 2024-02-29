@@ -2,7 +2,7 @@
 ## cuTensor
 
 Provides an python interface to tensors in GPU. 
-Personal project just to learn how to manage tensors, provides a python interface with pybind etc.
+Personal project just to learn how to manage tensors, how to provide a python interface with pybind etc.
 
 ## Install
 
