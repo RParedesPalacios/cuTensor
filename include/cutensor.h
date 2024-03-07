@@ -45,6 +45,8 @@ class cuTensor {
     void print();
     string tostr();
     void reshape(const tshape &newshape);
+    void squeeze();
+    void unsqueeze(int axis);
     const tshape& getShape() const;
     const int getDim() const;
     const int getDevice() const;

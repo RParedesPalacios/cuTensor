@@ -63,7 +63,9 @@ PYBIND11_MODULE(cuTensor, m) {
         .def("fill", (void (cuTensor::*)(float)) &cuTensor::fill, py::arg("value"))
         .def("print_array", &cuTensor::info)
         .def("print", &cuTensor::print)
-        .def("reshape", &cuTensor::reshape)       
+        .def("reshape", &cuTensor::reshape)
+        .def("squeeze", &cuTensor::squeeze)       
+        .def("unsqueeze", &cuTensor::unsqueeze)
         .def("permute", &cuTensor::permute)
         .def("apply", &cuTensor::apply)
 

@@ -21,12 +21,21 @@ b=b.permute([1,0]) #returns a new tensor
 b=~b #returns a new tensor
 
 
-# reshape tensor
-b.reshape([2,3,5])
+# reshape tensor all in-place operations
+b.reshape([2,3,5]) 
+print(b)
+
+b.reshape([1,1,2,1,3,1,5])
+print(b)
+
+b.squeeze()
+print(b)
+
+b.unsqueeze(0)
 print(b)
 
 #permute tensor
-b=b.permute([2,0,1])
+b=b.permute([2,0,1,3])
 print(b)
 
 

@@ -41,6 +41,31 @@ void cuTensor::reshape(const tshape &nshape)
     }
 }
 
+
+
+void cuTensor::squeeze()
+{
+    tshape nshape;
+    for (int i = 0; i < ndim; i++)
+    {
+        if (shape[i] != 1) nshape.push_back(shape[i]);
+    }
+    if (nshape.size() == 0) nshape.push_back(1);
+    reshape(nshape);
+}
+
+void cuTensor::unsqueeze(int axis)
+{
+    if (axis < 0 || axis > ndim) msg("error: axis out of range\n");
+    tshape nshape;
+    for (int i = 0; i < axis; i++) nshape.push_back(shape[i]);
+    nshape.push_back(1);
+    for (int i = axis; i < ndim; i++) nshape.push_back(shape[i]);
+    reshape(nshape);
+}
+
+
+
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////
@@ -215,3 +240,4 @@ cuTensor * cuTensor::pow(float s)
     gpu_pow(ptr,C->ptr,size,s,device);
     return C;
 }
+
