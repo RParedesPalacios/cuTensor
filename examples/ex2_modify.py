@@ -10,17 +10,6 @@ print(b)
 b.reshape([6,5])  # in-place operation
 print(b)
 
-# transpose tensor, returns a new tensor
-b=b.transpose()
-print(b)
-
-# or
-b=b.permute([1,0]) #returns a new tensor
-
-# or 
-b=~b #returns a new tensor
-
-
 # reshape tensor all in-place operations
 b.reshape([2,3,5]) 
 print(b)
@@ -34,7 +23,26 @@ print(b)
 b.unsqueeze(0)
 print(b)
 
-#permute tensor
+b.squeeze()
+print(b)
+
+b.reshape([6,5])  
+print(b)
+
+# transpose tensor, returns a new tensor
+b=b.transpose()
+print(b)
+
+# or
+b=b.permute([1,0]) #returns a new tensor
+
+# or 
+b=~b #returns a new tensor
+
+b.reshape([1,2,3,5])
+print(b)
+
+#permute tensor, returns a new tensor
 b=b.permute([2,0,1,3])
 print(b)
 

@@ -54,7 +54,8 @@ class cuTensor {
     const tshape& getStride() const;    
     const string getName() const;
     void apply(py::function func, py::args args, py::kwargs kwargs);
-    
+    py::array_t<float> tonumpy();
+
     //OPS
     static cuTensor *sum(cuTensor *A, cuTensor *B);
     static cuTensor *sumf(cuTensor *A, float s);

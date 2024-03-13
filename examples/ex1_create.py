@@ -36,6 +36,7 @@ b.print_array()
 
 # create a tensor from numpy array and device
 b = T.from_array(np.random.rand(2,3), name="b", device=0)
+b.print_array()
 
 # clone tensor
 c = b.clone("c")
@@ -48,6 +49,11 @@ print(b.shape)
 print(b.size)
 print(b.stride)
 print(b.dim)
+
+# tensor to numpy array
+c=b.tonumpy()
+print(c.shape)
+print(c)
 
 
 
