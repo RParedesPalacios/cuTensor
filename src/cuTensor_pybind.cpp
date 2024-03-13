@@ -158,6 +158,10 @@ PYBIND11_MODULE(cuTensor, m) {
             cuTensor *t = cuTensor::elementwise_product(&t1, &t2);
             return t;
         })
+        .def("__matmul__", [](cuTensor& t1, cuTensor& t2) {
+            cuTensor *t = cuTensor::mult2D(&t1, &t2);
+            return t;
+        })
         .def("__truediv__", [](cuTensor& t1, float s) {
             cuTensor *t = cuTensor::mult(&t1, 1.0/s);
             return t;

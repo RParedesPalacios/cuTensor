@@ -64,3 +64,7 @@ b=T.from_array(np.random.rand(3,5), name="b")
 
 c=T.mm(a,~b) # 3,5 * 5,3 = 3,3, b is not modified, a new tensor is created in ~b
 print(c)
+
+# OR
+c=a@~b
+print(c)
