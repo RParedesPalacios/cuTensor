@@ -3,7 +3,7 @@ import numpy as np
 
 
 # create a tensor from numpy array
-b = T.from_array(np.random.rand(2,3,5), name="b")
+b = T.from_numpy(np.random.rand(2,3,5), name="b")
 print(b)
 
 # reshape tensor

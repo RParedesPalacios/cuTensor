@@ -31,11 +31,11 @@ a.fill(1.0)
 a.print_array()
 
 # create a tensor from numpy array
-b = T.from_array(np.random.rand(2,3), name="b")
+b = T.from_numpy(np.random.rand(2,3), name="b")
 b.print_array()
 
 # create a tensor from numpy array and device
-b = T.from_array(np.random.rand(2,3), name="b", device=0)
+b = T.from_numpy(np.random.rand(2,3), name="b", device=0)
 b.print_array()
 
 # clone tensor
@@ -51,7 +51,7 @@ print(b.stride)
 print(b.dim)
 
 # tensor to numpy array
-c=b.tonumpy()
+c=b.to_numpy()
 print(c.shape)
 print(c)
 

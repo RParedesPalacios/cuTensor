@@ -25,7 +25,7 @@ void cuTensor::apply(py::function func, py::args args, py::kwargs kwargs) {
         delete[] cpu_data;
 }
 
- py::array_t<float>cuTensor::tonumpy() {
+ py::array_t<float>cuTensor::to_numpy() {
         // Copy tensor data to CPU memory
         float *cpu_data = new float[size];
         //info();
@@ -79,12 +79,11 @@ PYBIND11_MODULE(cuTensor, m) {
         .def("unsqueeze", &cuTensor::unsqueeze)
         .def("permute", &cuTensor::permute)
         .def("apply", &cuTensor::apply)
-        .def("tonumpy", &cuTensor::tonumpy)
+        .def("to_numpy", &cuTensor::to_numpy)
 
         // static
         .def_static("mm", &cuTensor::mult2D)
         .def_static("from_numpy", from_numpy, py::arg("array"), py::arg("device")=0, py::arg("name")="")
-        .def_static("from_array", from_numpy, py::arg("array"), py::arg("device")=0, py::arg("name")="")
         .def_static("from_file", from_file, py::arg("filename"), py::arg("device")=0, py::arg("name")="")
 
 

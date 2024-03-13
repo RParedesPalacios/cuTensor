@@ -3,10 +3,10 @@ import numpy as np
 
 
 # create a tensor from numpy array
-b = T.from_array(np.random.rand(2,3,5), name="b")
+b = T.from_numpy(np.random.rand(2,3,5), name="b")
 print(b)
 
-a=T.from_array(np.random.rand(2,3,5), name="a")
+a=T.from_numpy(np.random.rand(2,3,5), name="a")
 print(a)
 
 # sum of tensors
@@ -52,15 +52,15 @@ print(len(a))
 c=(2*a+b)/-(b**2)
 
 # matrix multiplication (mult2D), broadcasting is supported
-a=T.from_array(np.random.rand(2,10,3,5), name="a")
-b=T.from_array(np.random.rand(3,5,4,7), name="b")
+a=T.from_numpy(np.random.rand(2,10,3,5), name="a")
+b=T.from_numpy(np.random.rand(3,5,4,7), name="b")
 
 c=T.mm(a,b) # 2,10,3,5 * 3,5,4,7 = 2,10,4,7
 print(c)
 
 # transpose, etc...
-a=T.from_array(np.random.rand(3,5), name="a")
-b=T.from_array(np.random.rand(3,5), name="b")
+a=T.from_numpy(np.random.rand(3,5), name="a")
+b=T.from_numpy(np.random.rand(3,5), name="b")
 
 c=T.mm(a,~b) # 3,5 * 5,3 = 3,3, b is not modified, a new tensor is created in ~b
 print(c)
