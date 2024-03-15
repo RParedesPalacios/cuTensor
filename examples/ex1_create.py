@@ -6,7 +6,7 @@ import numpy as np
 cuTensor.hw_info()
 
 # get cuTensor version
-print(cuTensor.__version__)
+print("Version",cuTensor.__version__)
 
 # create a tensor from shape
 a = T([2,3])
@@ -39,6 +39,9 @@ b = T.from_numpy(np.random.rand(2,3), name="b", device=0)
 b.print_array()
 
 # clone tensor
+c = T.clone(b)
+c = b.clone()
+# or add name
 c = b.clone("c")
 print(c)
 
