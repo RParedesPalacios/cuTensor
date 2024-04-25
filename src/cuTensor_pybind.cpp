@@ -7,7 +7,7 @@ namespace py = pybind11;
 string version("0.1");
 
 
-// To apply a python function to the tensor
+// To apply a python function to the tensor.
 void cuTensor::apply(py::function func, py::args args, py::kwargs kwargs) {
         // Copy tensor data to CPU memory
         float *cpu_data = new float[size];
