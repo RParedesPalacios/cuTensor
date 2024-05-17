@@ -13,12 +13,14 @@ print(a)
 c=a+b
 print(c)
 
-# can be broadcasted, shape of the second tensor
-a.reshape([1,3,5,2])
+# can be broadcasted, shape of the larger tensor is preserved
+a=T.from_numpy(np.random.rand(4,2,3,5), name="a")
+
 c=a+b
 c.setName("c") # we can set name of tensor
 print(c)
 
+print("==========")
 c=b+a
 c.setName("c")
 print(c)
