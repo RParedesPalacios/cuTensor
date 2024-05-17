@@ -25,6 +25,13 @@ c=b+a
 c.setName("c")
 print(c)
 
+# create a tensor from numpy array
+b = T.from_numpy(np.random.rand(2,3,5), name="b")
+print(b)
+
+a=T.from_numpy(np.random.rand(2,3,5), name="a")
+print(a)
+
 # with scalar
 c=a+1
 
