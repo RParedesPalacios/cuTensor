@@ -46,6 +46,12 @@ You can override it with:
 export CMAKE_CUDA_ARCHITECTURES=100
 ```
 
+If you have multiple CUDA toolchains installed, pin the compiler explicitly:
+
+```console
+export CUDACXX=/usr/local/cuda/bin/nvcc
+```
+
 ## Test the installation
 ```console
 python -c "import cuTensor"

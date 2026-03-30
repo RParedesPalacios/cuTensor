@@ -19,6 +19,9 @@ class CMakeBuild(build_ext):
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
                       '-DPYTHON_EXECUTABLE=' + os.sys.executable]
+        cuda_compiler = self._resolve_cuda_compiler()
+        if cuda_compiler:
+            cmake_args.append('-DCMAKE_CUDA_COMPILER=' + cuda_compiler)
         cuda_architectures = self._resolve_cuda_architectures()
         if cuda_architectures:
             cmake_args.append('-DCMAKE_CUDA_ARCHITECTURES=' + cuda_architectures)
@@ -53,6 +56,13 @@ class CMakeBuild(build_ext):
                 if compiler:
                     return compiler
 
+        return None
+
+    @staticmethod
+    def _resolve_cuda_compiler():
+        explicit = os.environ.get('CUDACXX')
+        if explicit:
+            return explicit
         return None
 
     @staticmethod
