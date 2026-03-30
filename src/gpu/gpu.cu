@@ -114,6 +114,12 @@ void gpu_copy_to(int device, long int size, float *cpu_ptr, float *ptr)
     check_cuda(cudaMemcpy(ptr,cpu_ptr,size*sizeof(float),cudaMemcpyHostToDevice),"gpu_copy");
 }
 
+void gpu_copy_device(int device, long int size, float *src, float *dst)
+{
+    cudaSetDevice(device);
+    check_cuda(cudaMemcpy(dst, src, size * sizeof(float), cudaMemcpyDeviceToDevice), "gpu_copy_device");
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 __global__ void fill_(float* a, float v, long int size){

@@ -6,39 +6,35 @@ namespace py = pybind11;
 
 string version("0.1");
 
+static std::vector<py::ssize_t> to_py_shape(const tshape &shape) {
+    std::vector<py::ssize_t> py_shape;
+    py_shape.reserve(shape.size());
+    for (int dim : shape) {
+        py_shape.push_back(static_cast<py::ssize_t>(dim));
+    }
+    return py_shape;
+}
+
 
 // To apply a python function to the tensor.
 void cuTensor::apply(py::function func, py::args args, py::kwargs kwargs) {
-        // Copy tensor data to CPU memory
-        float *cpu_data = new float[size];
-        //info();
-        gpu_copy_from(device, size, ptr, cpu_data);
-
-        // Convert the CPU data to a NumPy array
-        py::array_t<float> data_array({size}, cpu_data);
+        py::array_t<float> data_array(to_py_shape(shape));
+        gpu_copy_from(device, size, ptr, static_cast<float *>(data_array.mutable_data()));
 
         // Call the provided function on the CPU data
         func(data_array, *args, **kwargs);   
 
         gpu_copy_to(device, size, (float *)data_array.mutable_data(), ptr);
-
-        delete[] cpu_data;
 }
 
  py::array_t<float>cuTensor::to_numpy() {
-        // Copy tensor data to CPU memory
-        float *cpu_data = new float[size];
-        //info();
-        gpu_copy_from(device, size, ptr, cpu_data);
-
-        // Convert the CPU data to a NumPy array with the same shape
-        py::array_t<float> data_array(shape, cpu_data);
-
+        py::array_t<float> data_array(to_py_shape(shape));
+        gpu_copy_from(device, size, ptr, static_cast<float *>(data_array.mutable_data()));
         return data_array;
 }
 
 // create tensor from numpy array
-static cuTensor* from_numpy(const py::array_t<float>& arr, const int device=0, const string name="") {
+static cuTensor* from_numpy(const py::array_t<float, py::array::c_style | py::array::forcecast>& arr, const int device=0, const string name="") {
         py::buffer_info buf = arr.request();
         std::vector<int> shape;
         for (auto dim : buf.shape) {
@@ -101,8 +97,7 @@ PYBIND11_MODULE(cuTensor, m) {
         })
         .def("transpose",[](cuTensor &self) {
             if (self.get_ndim()!=2){
-                printf("transpose only for 2D Tensor, use permute instead\n");
-                exit(1);
+                throw py::value_error("transpose only for 2D Tensor, use permute instead");
             }
             return self.permute({1,0});
         })
@@ -120,8 +115,7 @@ PYBIND11_MODULE(cuTensor, m) {
         .def("__len__", &cuTensor::getSize)
         .def("__invert__",[](cuTensor &self) {
             if (self.get_ndim()!=2){
-                printf("transpose only for 2D Tensor, use permute instead\n");
-                exit(1);
+                throw py::value_error("transpose only for 2D Tensor, use permute instead");
             }
             return self.permute({1,0});
         })
@@ -130,10 +124,10 @@ PYBIND11_MODULE(cuTensor, m) {
             return t;
         })
         .def("__sub__", [](cuTensor& t1, cuTensor& t2) {
-            cuTensor *t = cuTensor::mult(&t2, -1);
-            cuTensor *t3 = cuTensor::sum(&t1, cuTensor::mult(&t2, -1));
-            delete t;
-            return t3;
+            cuTensor *neg = cuTensor::mult(&t2, -1);
+            cuTensor *out = cuTensor::sum(&t1, neg);
+            delete neg;
+            return out;
         })
         .def("__add__", [](cuTensor& t1, float s) {
             cuTensor *t = cuTensor::sumf(&t1, s);

@@ -1,13 +1,13 @@
 #include <iostream>
 #include <iomanip>
+#include <stdexcept>
 #include "cutensor.h"
 
 using namespace std;
 
 void msg(const char *s)
 {
-    printf("%s",s);
-    exit(1);
+    throw std::runtime_error(s);
 }
 
 void print_shape(const tshape &shape)
@@ -37,19 +37,23 @@ cuTensor::cuTensor(const tshape &s, const int dev, const string n)
     device = dev;
     name = n;
 
-    size=1;
-    for (int i = ndim - 1; i >= 0; i--) {
-        if (shape[i]<0) msg("error negative shape");
-        size *= shape[i];
-    }
-    // initialize the stride
-    strides.resize(ndim);
-    strides[ndim-1]=1;
-    for (int i = ndim - 2; i >= 0; i--) {
-        strides[i]=strides[i+1]*shape[i+1];
+    size = 1;
+    for (int i = static_cast<int>(ndim) - 1; i >= 0; i--) {
+        if (shape[i] <= 0) msg("error: shape values must be positive");
+        size *= static_cast<unsigned long int>(shape[i]);
     }
 
-    ptr = gpu_create_tensor(device,size);
+    // initialize strides for contiguous layout
+    strides.clear();
+    if (ndim > 0) {
+        strides.resize(ndim);
+        strides[ndim - 1] = 1;
+        for (int i = static_cast<int>(ndim) - 2; i >= 0; i--) {
+            strides[i] = strides[i + 1] * shape[i + 1];
+        }
+    }
+
+    ptr = gpu_create_tensor(device, size);
 }
 
 cuTensor::cuTensor(const tshape &shape):cuTensor(shape,0,""){}
@@ -62,7 +66,9 @@ cuTensor::cuTensor(const tshape &shape, float *cpu_ptr, const int dev, const str
 
 cuTensor::~cuTensor()
 {
-    gpu_delete_tensor(device,ptr);
+    if (ptr != nullptr) {
+        gpu_delete_tensor(device, ptr);
+    }
 }
 
 ////////////////////////////////////////
@@ -75,8 +81,8 @@ int cuTensor::get_ndim() {
 cuTensor *cuTensor::clone() const
 {
     cuTensor *B = new cuTensor(shape, device);
-    B->name=name;
-    gpu_copy_to(device, size, ptr, B->ptr);
+    B->name = name;
+    gpu_copy_device(device, size, ptr, B->ptr);
     return B;
 }
 

@@ -8,9 +8,9 @@ using namespace std;
 /// reshape tensor to a new shape, admiting "-1" e.g. (2,3,5) to (-1,5) should be (6,5) 
 void cuTensor::reshape(const tshape &nshape)
 {
-    int newsize = 1;
+    unsigned long int newsize = 1;
     int neg_index = -1;
-    tshape newshape=nshape;
+    tshape newshape = nshape;
 
     for (int i = 0; i < newshape.size(); i++)
     {
@@ -19,13 +19,19 @@ void cuTensor::reshape(const tshape &nshape)
             if (neg_index != -1) msg("error: multiple occurrences of -1 in new shape\n");
             neg_index = i;
         }
-        else newsize *= newshape[i];
+        else {
+            if (newshape[i] <= 0) msg("error: shape values must be positive or -1\n");
+            newsize *= static_cast<unsigned long int>(newshape[i]);
+        }
     }
 
     if (neg_index != -1)
     {
-        if (size % newsize != 0) msg("error: cannot reshape tensor, size mismatch\n");
-        newshape[neg_index] = size / newsize;
+        if (newsize == 0 || size % newsize != 0) msg("error: cannot reshape tensor, size mismatch\n");
+        int inferred = static_cast<int>(size / newsize);
+        if (inferred <= 0) msg("error: inferred shape is not positive\n");
+        newshape[neg_index] = inferred;
+        newsize *= static_cast<unsigned long int>(inferred);
     }
     else
     {
@@ -34,10 +40,13 @@ void cuTensor::reshape(const tshape &nshape)
 
     shape = newshape;
     ndim = shape.size();
-    strides.resize(ndim);
-    strides[ndim-1]=1;
-    for (int i = ndim - 2; i >= 0; i--) {
-        strides[i]=strides[i+1]*shape[i+1];
+    strides.clear();
+    if (ndim > 0) {
+        strides.resize(ndim);
+        strides[ndim - 1] = 1;
+        for (int i = static_cast<int>(ndim) - 2; i >= 0; i--) {
+            strides[i] = strides[i + 1] * shape[i + 1];
+        }
     }
 }
 
@@ -80,24 +89,21 @@ void cuTensor::permute_(tshape perm)
 {
     if (perm.size() != ndim) msg("error: permute must have the same number of dimensions\n");
 
-    // check that in perm are all the dims
-    for (int i = 0; i < ndim; i++)
+    if (ndim == 0) return;
+
+    // validate permutation indices [0, ndim)
+    vector<bool> seen(ndim, false);
+    for (int i = 0; i < static_cast<int>(ndim); i++)
     {
-        bool found = false;
-        for (int j = 0; j < ndim; j++)
-        {
-            if (perm[j] == i)
-            {
-                found = true;
-                break;
-            }
-        }
-        if (!found) msg("error: permute must contain all the dimensions\n");
+        int p = perm[i];
+        if (p < 0 || p >= static_cast<int>(ndim)) msg("error: permute index out of range\n");
+        if (seen[p]) msg("error: permute indices must be unique\n");
+        seen[p] = true;
     }
 
     // update shape
     tshape nshape(ndim);
-    for (int i = 0; i < ndim; i++)
+    for (int i = 0; i < static_cast<int>(ndim); i++)
     {
         nshape[i] = shape[perm[i]];
     }
@@ -105,11 +111,11 @@ void cuTensor::permute_(tshape perm)
 
     // new strides
     tshape nstrides(ndim);
-    nstrides[ndim-1]=1;
-    for (int i = ndim - 2; i >= 0; i--) {
-        nstrides[i]=nstrides[i+1]*shape[i+1];
+    nstrides[ndim - 1] = 1;
+    for (int i = static_cast<int>(ndim) - 2; i >= 0; i--) {
+        nstrides[i] = nstrides[i + 1] * shape[i + 1];
     }    
-    gpu_permute_(device, size, ndim, strides.data(), nstrides.data(),perm.data(), ptr);
+    gpu_permute_(device, size, ndim, strides.data(), nstrides.data(), perm.data(), ptr);
 
     strides=nstrides;
 }
@@ -240,4 +246,3 @@ cuTensor * cuTensor::pow(float s)
     gpu_pow(ptr,C->ptr,size,s,device);
     return C;
 }
-
