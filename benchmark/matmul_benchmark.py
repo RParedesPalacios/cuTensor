@@ -39,6 +39,57 @@ class BenchResult:
     max_rel_error: float
 
 
+def _consume_call(fn: Callable[[], object], device: int) -> None:
+    out = fn()
+    torch.cuda.synchronize(device)
+    del out
+
+
+def _time_call(fn: Callable[[], object], device: int) -> float:
+    start = torch.cuda.Event(enable_timing=True)
+    end = torch.cuda.Event(enable_timing=True)
+    start.record()
+    out = fn()
+    end.record()
+    torch.cuda.synchronize(device)
+    elapsed_ms = float(start.elapsed_time(end))
+    del out
+    return elapsed_ms
+
+
+def _run_in_order(
+    order: str,
+    repeats: int,
+    run_cutensor: Callable[[], None],
+    run_torch: Callable[[], None],
+) -> None:
+    if order == "alternate":
+        for i in range(repeats):
+            if i % 2 == 0:
+                run_cutensor()
+                run_torch()
+            else:
+                run_torch()
+                run_cutensor()
+        return
+
+    if order == "cutensor_first":
+        for _ in range(repeats):
+            run_cutensor()
+        for _ in range(repeats):
+            run_torch()
+        return
+
+    if order == "pytorch_first":
+        for _ in range(repeats):
+            run_torch()
+        for _ in range(repeats):
+            run_cutensor()
+        return
+
+    raise ValueError(f"Orden no soportado: {order}")
+
+
 def parse_sizes(raw: str) -> list[int]:
     sizes: list[int] = []
     for chunk in raw.split(","):
@@ -54,29 +105,44 @@ def parse_sizes(raw: str) -> list[int]:
     return sizes
 
 
-def time_backend(
-    fn: Callable[[], object],
+def time_backends(
+    cutensor_fn: Callable[[], object],
+    torch_fn: Callable[[], object],
     repeats: int,
     device: int,
-) -> tuple[float, float]:
-    timings_ms: list[float] = []
-    for _ in range(repeats):
-        start = torch.cuda.Event(enable_timing=True)
-        end = torch.cuda.Event(enable_timing=True)
-        start.record()
-        out = fn()
-        end.record()
-        torch.cuda.synchronize(device)
-        timings_ms.append(float(start.elapsed_time(end)))
-        del out
-    return mean(timings_ms), pstdev(timings_ms)
+    order: str,
+) -> tuple[float, float, float, float]:
+    cutensor_timings_ms: list[float] = []
+    torch_timings_ms: list[float] = []
+
+    _run_in_order(
+        order=order,
+        repeats=repeats,
+        run_cutensor=lambda: cutensor_timings_ms.append(_time_call(cutensor_fn, device)),
+        run_torch=lambda: torch_timings_ms.append(_time_call(torch_fn, device)),
+    )
+
+    return (
+        mean(cutensor_timings_ms),
+        pstdev(cutensor_timings_ms),
+        mean(torch_timings_ms),
+        pstdev(torch_timings_ms),
+    )
 
 
-def warmup(fn: Callable[[], object], steps: int, device: int) -> None:
-    for _ in range(steps):
-        out = fn()
-        torch.cuda.synchronize(device)
-        del out
+def warmup(
+    cutensor_fn: Callable[[], object],
+    torch_fn: Callable[[], object],
+    steps: int,
+    device: int,
+    order: str,
+) -> None:
+    _run_in_order(
+        order=order,
+        repeats=steps,
+        run_cutensor=lambda: _consume_call(cutensor_fn, device),
+        run_torch=lambda: _consume_call(torch_fn, device),
+    )
 
 
 def compare_outputs(
@@ -109,6 +175,7 @@ def run_benchmark(
     warmup_steps: int,
     device: int,
     seed: int,
+    order: str,
 ) -> list[BenchResult]:
     rng = np.random.default_rng(seed)
     results: list[BenchResult] = []
@@ -127,11 +194,11 @@ def run_benchmark(
         cutensor_fn = lambda: CuTensor.mm(a_cutensor, b_cutensor)
         torch_fn = lambda: torch.matmul(a_torch, b_torch)
 
-        warmup(cutensor_fn, warmup_steps, device)
-        warmup(torch_fn, warmup_steps, device)
+        warmup(cutensor_fn, torch_fn, warmup_steps, device, order)
 
-        cutensor_mean_ms, cutensor_std_ms = time_backend(cutensor_fn, repeats, device)
-        torch_mean_ms, torch_std_ms = time_backend(torch_fn, repeats, device)
+        cutensor_mean_ms, cutensor_std_ms, torch_mean_ms, torch_std_ms = time_backends(
+            cutensor_fn, torch_fn, repeats, device, order
+        )
         max_abs_error, max_rel_error = compare_outputs(
             a_cutensor, b_cutensor, a_torch, b_torch, device
         )
@@ -232,6 +299,7 @@ def write_markdown_report(
     lines.append(f"- CUDA (torch): `{torch.version.cuda}`")
     lines.append(f"- Repeticiones por tamano: `{args.repeats}`")
     lines.append(f"- Warmup por backend: `{args.warmup}`")
+    lines.append(f"- Orden de ejecucion: `{args.order}`")
     lines.append(f"- Tamanos: `{args.sizes}`")
     lines.append("")
     lines.append(
@@ -310,6 +378,12 @@ def parse_args() -> argparse.Namespace:
         default="benchmark/results",
         help="Directorio de salida para CSV y reporte Markdown.",
     )
+    parser.add_argument(
+        "--order",
+        choices=["alternate", "cutensor_first", "pytorch_first"],
+        default="alternate",
+        help="Orden de ejecucion por backend en warmup y medicion.",
+    )
     return parser.parse_args()
 
 
@@ -349,6 +423,7 @@ def main() -> int:
         warmup_steps=args.warmup,
         device=args.device,
         seed=args.seed,
+        order=args.order,
     )
     write_csv(csv_path, results)
     write_markdown_report(report_path, results, args)

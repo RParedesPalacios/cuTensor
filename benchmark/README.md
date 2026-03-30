@@ -24,7 +24,8 @@ python3 benchmark/matmul_benchmark.py \
   --sizes 128,256,512,1024,2048 \
   --repeats 20 \
   --warmup 5 \
-  --device 0
+  --device 0 \
+  --order alternate
 ```
 
 ## Salidas
@@ -40,6 +41,10 @@ Se generan en `benchmark/results/`:
 - Carga los datos una vez en cada backend (cuTensor y PyTorch).
 - Mide solo la operacion `matmul` (con sincronizacion CUDA explicita tras cada iteracion).
 - Valida precision numerica comparando salida cuTensor vs PyTorch (`max abs error` y `max rel error`).
+- Puedes elegir el orden de ejecucion con `--order`:
+  - `alternate` (recomendado para reducir sesgo de orden)
+  - `cutensor_first`
+  - `pytorch_first`
 
 ## Notas
 
