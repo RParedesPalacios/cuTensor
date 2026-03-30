@@ -39,7 +39,8 @@ Se generan en `benchmark/results/`:
 
 - Para cada tamano `N`, genera matrices aleatorias `N x N` en `float32`.
 - Carga los datos una vez en cada backend (cuTensor y PyTorch).
-- Mide solo la operacion `matmul` (con sincronizacion CUDA explicita tras cada iteracion).
+- Prealoca la salida en ambos backends (`cuTensor.mm_out` y `torch.mm(..., out=...)`).
+- Mide solo la operacion `matmul` (con sincronizacion CUDA explicita tras cada iteracion y sin incluir asignacion de salida).
 - Valida precision numerica comparando salida cuTensor vs PyTorch (`max abs error` y `max rel error`).
 - Puedes elegir el orden de ejecucion con `--order`:
   - `alternate` (recomendado para reducir sesgo de orden)

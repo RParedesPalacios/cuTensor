@@ -60,6 +60,7 @@ class cuTensor {
     static cuTensor *sum(cuTensor *A, cuTensor *B);
     static cuTensor *sumf(cuTensor *A, float s);
     static cuTensor *mult2D(cuTensor *A, cuTensor *B);
+    static void mult2D_out(cuTensor *A, cuTensor *B, cuTensor *C);
     static cuTensor *mult(cuTensor *A, float s);
     static cuTensor *elementwise_product(cuTensor *A, cuTensor *B);
     
@@ -70,6 +71,5 @@ class cuTensor {
     void permute_(tshape perm);
     cuTensor* permute(tshape perm);
 };
-
 
 

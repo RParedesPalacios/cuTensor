@@ -216,6 +216,42 @@ cuTensor * cuTensor::mult2D(cuTensor *A, cuTensor *B)
     return C;
 }
 
+void cuTensor::mult2D_out(cuTensor *A, cuTensor *B, cuTensor *C)
+{
+    tshape inis, ends;
+    tshape As = A->shape;
+    tshape Bs = B->shape;
+    int apos, bpos, match;
+
+    if (A->ndim < 2) msg("error tensor size mismatch\n");
+    if (B->ndim < 2) msg("error tensor size mismatch\n");
+    if (A->device != B->device) msg("error tensor device mismatch\n");
+    if (C->device != A->device) msg("error tensor device mismatch\n");
+
+    find_match_dims(A->shape, B->shape, apos, bpos, match);
+    if (match == -1) msg("error tensor size mismatch\n");
+
+    inis = {A->shape.begin(), A->shape.begin() + apos};
+    ends = {B->shape.begin() + bpos + 1, B->shape.end()};
+
+    tshape outshape;
+    outshape.insert(outshape.end(), inis.begin(), inis.end());
+    outshape.insert(outshape.end(), ends.begin(), ends.end());
+
+    if (C->shape != outshape) msg("error output tensor shape mismatch\n");
+
+    A->reshape({-1, match});
+    B->reshape({match, -1});
+
+    if (A->shape[1] != B->shape[0]) msg("error tensor size mismatch\n");
+    if (A->shape[0] * B->shape[1] != C->size) msg("error output tensor size mismatch\n");
+
+    gpu_mult2D(A->ptr, B->ptr, C->ptr, A->shape[0], A->shape[1], B->shape[1], A->device);
+
+    A->reshape(As);
+    B->reshape(Bs);
+}
+
 cuTensor * cuTensor::mult(cuTensor *A, float s)
 {
     cuTensor *C=new cuTensor(A->shape,A->device);

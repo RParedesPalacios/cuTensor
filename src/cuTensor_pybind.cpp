@@ -79,6 +79,9 @@ PYBIND11_MODULE(cuTensor, m) {
 
         // static
         .def_static("mm", &cuTensor::mult2D)
+        .def_static("mm_out", [](cuTensor &a, cuTensor &b, cuTensor &out) {
+            cuTensor::mult2D_out(&a, &b, &out);
+        })
         .def_static("from_numpy", from_numpy, py::arg("array"), py::arg("device")=0, py::arg("name")="")
         .def_static("from_file", from_file, py::arg("filename"), py::arg("device")=0, py::arg("name")="")
 

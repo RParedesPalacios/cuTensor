@@ -148,19 +148,19 @@ def warmup(
 def compare_outputs(
     a_cutensor: CuTensor,
     b_cutensor: CuTensor,
+    out_cutensor: CuTensor,
     a_torch: torch.Tensor,
     b_torch: torch.Tensor,
+    out_torch: torch.Tensor,
     device: int,
 ) -> tuple[float, float]:
-    c_cutensor = CuTensor.mm(a_cutensor, b_cutensor)
+    CuTensor.mm_out(a_cutensor, b_cutensor, out_cutensor)
     torch.cuda.synchronize(device)
-    c_cutensor_np = c_cutensor.to_numpy()
-    del c_cutensor
+    c_cutensor_np = out_cutensor.to_numpy()
 
-    c_torch = torch.matmul(a_torch, b_torch)
+    torch.mm(a_torch, b_torch, out=out_torch)
     torch.cuda.synchronize(device)
-    c_torch_np = c_torch.detach().cpu().numpy()
-    del c_torch
+    c_torch_np = out_torch.detach().cpu().numpy()
 
     diff = np.abs(c_cutensor_np - c_torch_np)
     max_abs = float(np.max(diff))
@@ -187,12 +187,14 @@ def run_benchmark(
 
         a_cutensor = CuTensor.from_numpy(a_np, device=device, name=f"A_{size}")
         b_cutensor = CuTensor.from_numpy(b_np, device=device, name=f"B_{size}")
+        out_cutensor = CuTensor([size, size], device=device, name=f"C_{size}")
 
         a_torch = torch.from_numpy(a_np).to(device=device)
         b_torch = torch.from_numpy(b_np).to(device=device)
+        out_torch = torch.empty((size, size), dtype=torch.float32, device=device)
 
-        cutensor_fn = lambda: CuTensor.mm(a_cutensor, b_cutensor)
-        torch_fn = lambda: torch.matmul(a_torch, b_torch)
+        cutensor_fn = lambda: CuTensor.mm_out(a_cutensor, b_cutensor, out_cutensor)
+        torch_fn = lambda: torch.mm(a_torch, b_torch, out=out_torch)
 
         warmup(cutensor_fn, torch_fn, warmup_steps, device, order)
 
@@ -200,7 +202,7 @@ def run_benchmark(
             cutensor_fn, torch_fn, repeats, device, order
         )
         max_abs_error, max_rel_error = compare_outputs(
-            a_cutensor, b_cutensor, a_torch, b_torch, device
+            a_cutensor, b_cutensor, out_cutensor, a_torch, b_torch, out_torch, device
         )
 
         speedup = torch_mean_ms / cutensor_mean_ms if cutensor_mean_ms > 0 else math.inf
@@ -227,8 +229,10 @@ def run_benchmark(
 
         del a_cutensor
         del b_cutensor
+        del out_cutensor
         del a_torch
         del b_torch
+        del out_torch
         torch.cuda.empty_cache()
 
     return results
@@ -300,6 +304,7 @@ def write_markdown_report(
     lines.append(f"- Repeticiones por tamano: `{args.repeats}`")
     lines.append(f"- Warmup por backend: `{args.warmup}`")
     lines.append(f"- Orden de ejecucion: `{args.order}`")
+    lines.append("- Salida prealocada: `si` (cuTensor `mm_out`, PyTorch `torch.mm(..., out=...)`)")
     lines.append(f"- Tamanos: `{args.sizes}`")
     lines.append("")
     lines.append(
