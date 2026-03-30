@@ -5,3 +5,5 @@ compile.sh
 token.txt
 cuTensor.so
 cuTensor.egg-info/*
+__pycache__/
+*.pyc
