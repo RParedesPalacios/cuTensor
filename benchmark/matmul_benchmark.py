@@ -284,9 +284,14 @@ def write_markdown_report(
     best = max(results, key=lambda r: r.speedup_cutensor_vs_torch)
     worst = min(results, key=lambda r: r.speedup_cutensor_vs_torch)
 
-    half = max(1, len(results) // 2)
-    small_avg = mean(r.speedup_cutensor_vs_torch for r in results[:half])
-    large_avg = mean(r.speedup_cutensor_vs_torch for r in results[half:])
+    split = max(1, len(results) // 2)
+    small_bucket = results[:split]
+    large_bucket = results[split:]
+    if not large_bucket:
+        large_bucket = small_bucket
+
+    small_avg = mean(r.speedup_cutensor_vs_torch for r in small_bucket)
+    large_avg = mean(r.speedup_cutensor_vs_torch for r in large_bucket)
 
     if large_avg > small_avg:
         trend = "cuTensor mejora su ventaja a medida que crece el tamano."
