@@ -87,6 +87,8 @@ static bool gpu_mult2D_lt(float *ptrA, float *ptrB, float *ptrC, int m, int n, i
     int returned_results = 0;
     cublasOperation_t op = CUBLAS_OP_N;
     cublasStatus_t status = CUBLAS_STATUS_SUCCESS;
+    size_t workspace_size = 0;
+    void *workspace = nullptr;
 
     status = cublasLtMatmulDescCreate(&operation_desc, CUBLAS_COMPUTE_32F, CUDA_R_32F);
     if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
@@ -113,8 +115,7 @@ static bool gpu_mult2D_lt(float *ptrA, float *ptrB, float *ptrC, int m, int n, i
     status = cublasLtMatmulPreferenceCreate(&preference);
     if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
 
-    size_t workspace_size = 0;
-    void *workspace = get_lt_workspace(device, workspace_size);
+    workspace = get_lt_workspace(device, workspace_size);
     status = cublasLtMatmulPreferenceSetAttribute(
         preference,
         CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
