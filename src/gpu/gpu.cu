@@ -6,6 +6,7 @@
 #include "../../include/gpu/gpu.h"
 
 cublasHandle_t hcublas[64];
+cublasLtHandle_t hcublaslt[64];
 curandGenerator_t random_generator[64];
 cublasStatus_t bstatus;
 curandStatus_t rstatus;
@@ -46,6 +47,7 @@ void gpu_init()
 
     int nDevices;
     cudaGetDeviceCount(&nDevices);
+    if (nDevices > 64) nDevices = 64;
 
     for (int i=0;i<nDevices;i++)
     {
@@ -56,6 +58,7 @@ void gpu_init()
         //fprintf(stderr,"GPU device %d, %s, ready\n",i,prop.name);
 
         check_cublas(cublasCreate(&(hcublas[i])),"cublasCreate");
+        check_cublas(cublasLtCreate(&(hcublaslt[i])),"cublasLtCreate");
         //fprintf(stderr,"CuBLAS running on GPU device %s\n",prop.name);
     }
 }

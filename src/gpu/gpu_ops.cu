@@ -2,6 +2,7 @@
 #include <string>
 #include <stdexcept>
 #include <iostream>
+#include <cstddef>
 
 #include "gpu.h"
 #include "gpu_ops.h"
@@ -45,15 +46,145 @@ void gpu_sumf(float *ptrA, float *ptrC, long int size, float s, int device)
     check_cuda(cudaDeviceSynchronize(),"gpu_sumf_");
 }
 
-// gpu mult2D C=A*B ussin cuBLAS taking into account that the matrices are stored in row-major order
+static constexpr size_t LT_WORKSPACE_BYTES = 1 << 25; // 32 MiB per device (lazy)
+static void* lt_workspace[64] = {nullptr};
+
+static void* get_lt_workspace(int device, size_t &workspace_size)
+{
+    workspace_size = 0;
+    if (device < 0 || device >= 64) return nullptr;
+    if (lt_workspace[device] == nullptr) {
+        cudaError_t err = cudaMalloc(&(lt_workspace[device]), LT_WORKSPACE_BYTES);
+        if (err != cudaSuccess) {
+            lt_workspace[device] = nullptr;
+            return nullptr;
+        }
+    }
+    workspace_size = LT_WORKSPACE_BYTES;
+    return lt_workspace[device];
+}
+
+static bool gpu_mult2D_lt(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int device)
+{
+    // Row-major trick:
+    // C_row(m,k)=A_row(m,n)*B_row(n,k) <=> C_col(k,m)=B_col(k,n)*A_col(n,m)
+    int m_col = k;
+    int n_col = m;
+    int k_col = n;
+    int lda = k;
+    int ldb = n;
+    int ldc = k;
+
+    const float alpha = 1.0f;
+    const float beta = 0.0f;
+
+    cublasLtMatmulDesc_t operation_desc = nullptr;
+    cublasLtMatrixLayout_t a_desc = nullptr;
+    cublasLtMatrixLayout_t b_desc = nullptr;
+    cublasLtMatrixLayout_t c_desc = nullptr;
+    cublasLtMatmulPreference_t preference = nullptr;
+    cublasLtMatmulHeuristicResult_t heuristic_result = {};
+    int returned_results = 0;
+    cublasOperation_t op = CUBLAS_OP_N;
+    cublasStatus_t status = CUBLAS_STATUS_SUCCESS;
+
+    status = cublasLtMatmulDescCreate(&operation_desc, CUBLAS_COMPUTE_32F, CUDA_R_32F);
+    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+
+    status = cublasLtMatmulDescSetAttribute(
+        operation_desc, CUBLASLT_MATMUL_DESC_TRANSA, &op, sizeof(op)
+    );
+    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+
+    status = cublasLtMatmulDescSetAttribute(
+        operation_desc, CUBLASLT_MATMUL_DESC_TRANSB, &op, sizeof(op)
+    );
+    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+
+    status = cublasLtMatrixLayoutCreate(&a_desc, CUDA_R_32F, m_col, k_col, lda); // ptrB
+    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+
+    status = cublasLtMatrixLayoutCreate(&b_desc, CUDA_R_32F, k_col, n_col, ldb); // ptrA
+    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+
+    status = cublasLtMatrixLayoutCreate(&c_desc, CUDA_R_32F, m_col, n_col, ldc); // ptrC
+    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+
+    status = cublasLtMatmulPreferenceCreate(&preference);
+    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+
+    size_t workspace_size = 0;
+    void *workspace = get_lt_workspace(device, workspace_size);
+    status = cublasLtMatmulPreferenceSetAttribute(
+        preference,
+        CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+        &workspace_size,
+        sizeof(workspace_size)
+    );
+    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+
+    status = cublasLtMatmulAlgoGetHeuristic(
+        hcublaslt[device],
+        operation_desc,
+        a_desc,
+        b_desc,
+        c_desc,
+        c_desc,
+        preference,
+        1,
+        &heuristic_result,
+        &returned_results
+    );
+    if (status != CUBLAS_STATUS_SUCCESS || returned_results == 0) goto cleanup;
+
+    status = cublasLtMatmul(
+        hcublaslt[device],
+        operation_desc,
+        &alpha,
+        ptrB,
+        a_desc,
+        ptrA,
+        b_desc,
+        &beta,
+        ptrC,
+        c_desc,
+        ptrC,
+        c_desc,
+        &heuristic_result.algo,
+        workspace,
+        workspace_size,
+        0
+    );
+
+cleanup:
+    if (preference) cublasLtMatmulPreferenceDestroy(preference);
+    if (c_desc) cublasLtMatrixLayoutDestroy(c_desc);
+    if (b_desc) cublasLtMatrixLayoutDestroy(b_desc);
+    if (a_desc) cublasLtMatrixLayoutDestroy(a_desc);
+    if (operation_desc) cublasLtMatmulDescDestroy(operation_desc);
+    return status == CUBLAS_STATUS_SUCCESS;
+}
+
+// gpu mult2D C=A*B using cuBLAS taking into account that the matrices are stored in row-major order
 void gpu_mult2D(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int device) // m=A0,n=A1,k=B1
 {
-    cudaSetDevice(device);
-    
-    float alpha = 1.0;
-    float beta = 0.0;
+    if (device < 0 || device >= 64) {
+        throw std::runtime_error("error setting device in gpu_mult2D");
+    }
+    check_cuda(cudaSetDevice(device), "gpu_mult2D_set_device");
 
-    check_cublas(cublasSgemm(hcublas[device], CUBLAS_OP_N, CUBLAS_OP_N, k, m, n, &alpha, ptrB, k, ptrA, n, &beta, ptrC, k), "cublasSgemm");
+    // Preferred path for newer CUDA stacks/GPUs.
+    // If unsupported on this device/runtime, fallback is classic SGEMM.
+    if (!gpu_mult2D_lt(ptrA, ptrB, ptrC, m, n, k, device)) {
+        float alpha = 1.0f;
+        float beta = 0.0f;
+        check_cublas(
+            cublasSgemm(
+                hcublas[device], CUBLAS_OP_N, CUBLAS_OP_N, k, m, n, &alpha, ptrB, k, ptrA, n, &beta, ptrC, k
+            ),
+            "cublasSgemm"
+        );
+    }
 }
 
 __global__ void gpu_elementwise_product_(float *a, float *b, float *c, long int size){
