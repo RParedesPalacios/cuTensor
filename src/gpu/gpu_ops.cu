@@ -3,6 +3,8 @@
 #include <stdexcept>
 #include <iostream>
 #include <cstddef>
+#include <unordered_map>
+#include <mutex>
 
 #include "gpu.h"
 #include "gpu_ops.h"
@@ -46,123 +48,228 @@ void gpu_sumf(float *ptrA, float *ptrC, long int size, float s, int device)
     check_cuda(cudaDeviceSynchronize(),"gpu_sumf_");
 }
 
-static constexpr size_t LT_WORKSPACE_BYTES = 1 << 25; // 32 MiB per device (lazy)
+static constexpr size_t LT_MAX_WORKSPACE_BYTES = 1 << 26; // 64 MiB cap per device
 static void* lt_workspace[64] = {nullptr};
+static size_t lt_workspace_bytes[64] = {0};
 
-static void* get_lt_workspace(int device, size_t &workspace_size)
-{
-    workspace_size = 0;
-    if (device < 0 || device >= 64) return nullptr;
-    if (lt_workspace[device] == nullptr) {
-        cudaError_t err = cudaMalloc(&(lt_workspace[device]), LT_WORKSPACE_BYTES);
-        if (err != cudaSuccess) {
-            lt_workspace[device] = nullptr;
-            return nullptr;
-        }
+struct LtKey {
+    int m_col;
+    int n_col;
+    int k_col;
+    int lda;
+    int ldb;
+    int ldc;
+
+    bool operator==(const LtKey &other) const {
+        return m_col == other.m_col &&
+               n_col == other.n_col &&
+               k_col == other.k_col &&
+               lda == other.lda &&
+               ldb == other.ldb &&
+               ldc == other.ldc;
     }
-    workspace_size = LT_WORKSPACE_BYTES;
-    return lt_workspace[device];
-}
+};
 
-static bool gpu_mult2D_lt(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int device)
-{
-    // Row-major trick:
-    // C_row(m,k)=A_row(m,n)*B_row(n,k) <=> C_col(k,m)=B_col(k,n)*A_col(n,m)
-    int m_col = k;
-    int n_col = m;
-    int k_col = n;
-    int lda = k;
-    int ldb = n;
-    int ldc = k;
+struct LtKeyHash {
+    size_t operator()(const LtKey &key) const {
+        size_t h = static_cast<size_t>(key.m_col);
+        h = h * 1315423911u + static_cast<size_t>(key.n_col);
+        h = h * 1315423911u + static_cast<size_t>(key.k_col);
+        h = h * 1315423911u + static_cast<size_t>(key.lda);
+        h = h * 1315423911u + static_cast<size_t>(key.ldb);
+        h = h * 1315423911u + static_cast<size_t>(key.ldc);
+        return h;
+    }
+};
 
-    const float alpha = 1.0f;
-    const float beta = 0.0f;
-
+struct LtPlan {
     cublasLtMatmulDesc_t operation_desc = nullptr;
     cublasLtMatrixLayout_t a_desc = nullptr;
     cublasLtMatrixLayout_t b_desc = nullptr;
     cublasLtMatrixLayout_t c_desc = nullptr;
+    cublasLtMatmulAlgo_t algo = {};
+    size_t workspace_bytes = 0;
+};
+
+struct LtCacheEntry {
+    bool initialized = false;
+    bool available = false;
+    LtPlan plan;
+};
+
+static std::unordered_map<LtKey, LtCacheEntry, LtKeyHash> lt_plan_cache[64];
+static std::mutex lt_cache_mutex[64];
+
+static void destroy_lt_plan(LtPlan &plan)
+{
+    if (plan.c_desc) cublasLtMatrixLayoutDestroy(plan.c_desc);
+    if (plan.b_desc) cublasLtMatrixLayoutDestroy(plan.b_desc);
+    if (plan.a_desc) cublasLtMatrixLayoutDestroy(plan.a_desc);
+    if (plan.operation_desc) cublasLtMatmulDescDestroy(plan.operation_desc);
+    plan = LtPlan{};
+}
+
+static LtKey make_lt_key(int m, int n, int k)
+{
+    LtKey key;
+    // Row-major trick:
+    // C_row(m,k)=A_row(m,n)*B_row(n,k) <=> C_col(k,m)=B_col(k,n)*A_col(n,m)
+    key.m_col = k;
+    key.n_col = m;
+    key.k_col = n;
+    key.lda = k;
+    key.ldb = n;
+    key.ldc = k;
+    return key;
+}
+
+static bool build_lt_plan(int device, const LtKey &key, LtPlan &plan)
+{
+    cublasStatus_t status = CUBLAS_STATUS_SUCCESS;
     cublasLtMatmulPreference_t preference = nullptr;
     cublasLtMatmulHeuristicResult_t heuristic_result = {};
     int returned_results = 0;
     cublasOperation_t op = CUBLAS_OP_N;
-    cublasStatus_t status = CUBLAS_STATUS_SUCCESS;
-    size_t workspace_size = 0;
-    void *workspace = nullptr;
+    size_t max_workspace = LT_MAX_WORKSPACE_BYTES;
 
-    status = cublasLtMatmulDescCreate(&operation_desc, CUBLAS_COMPUTE_32F, CUDA_R_32F);
-    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+    status = cublasLtMatmulDescCreate(&plan.operation_desc, CUBLAS_COMPUTE_32F, CUDA_R_32F);
+    if (status != CUBLAS_STATUS_SUCCESS) goto fail;
 
     status = cublasLtMatmulDescSetAttribute(
-        operation_desc, CUBLASLT_MATMUL_DESC_TRANSA, &op, sizeof(op)
+        plan.operation_desc, CUBLASLT_MATMUL_DESC_TRANSA, &op, sizeof(op)
     );
-    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+    if (status != CUBLAS_STATUS_SUCCESS) goto fail;
 
     status = cublasLtMatmulDescSetAttribute(
-        operation_desc, CUBLASLT_MATMUL_DESC_TRANSB, &op, sizeof(op)
+        plan.operation_desc, CUBLASLT_MATMUL_DESC_TRANSB, &op, sizeof(op)
     );
-    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+    if (status != CUBLAS_STATUS_SUCCESS) goto fail;
 
-    status = cublasLtMatrixLayoutCreate(&a_desc, CUDA_R_32F, m_col, k_col, lda); // ptrB
-    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+    status = cublasLtMatrixLayoutCreate(&plan.a_desc, CUDA_R_32F, key.m_col, key.k_col, key.lda); // ptrB
+    if (status != CUBLAS_STATUS_SUCCESS) goto fail;
 
-    status = cublasLtMatrixLayoutCreate(&b_desc, CUDA_R_32F, k_col, n_col, ldb); // ptrA
-    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+    status = cublasLtMatrixLayoutCreate(&plan.b_desc, CUDA_R_32F, key.k_col, key.n_col, key.ldb); // ptrA
+    if (status != CUBLAS_STATUS_SUCCESS) goto fail;
 
-    status = cublasLtMatrixLayoutCreate(&c_desc, CUDA_R_32F, m_col, n_col, ldc); // ptrC
-    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+    status = cublasLtMatrixLayoutCreate(&plan.c_desc, CUDA_R_32F, key.m_col, key.n_col, key.ldc); // ptrC
+    if (status != CUBLAS_STATUS_SUCCESS) goto fail;
 
     status = cublasLtMatmulPreferenceCreate(&preference);
-    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+    if (status != CUBLAS_STATUS_SUCCESS) goto fail;
 
-    workspace = get_lt_workspace(device, workspace_size);
     status = cublasLtMatmulPreferenceSetAttribute(
         preference,
         CUBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
-        &workspace_size,
-        sizeof(workspace_size)
+        &max_workspace,
+        sizeof(max_workspace)
     );
-    if (status != CUBLAS_STATUS_SUCCESS) goto cleanup;
+    if (status != CUBLAS_STATUS_SUCCESS) goto fail;
 
     status = cublasLtMatmulAlgoGetHeuristic(
         hcublaslt[device],
-        operation_desc,
-        a_desc,
-        b_desc,
-        c_desc,
-        c_desc,
+        plan.operation_desc,
+        plan.a_desc,
+        plan.b_desc,
+        plan.c_desc,
+        plan.c_desc,
         preference,
         1,
         &heuristic_result,
         &returned_results
     );
-    if (status != CUBLAS_STATUS_SUCCESS || returned_results == 0) goto cleanup;
+    if (status != CUBLAS_STATUS_SUCCESS || returned_results == 0) goto fail;
 
-    status = cublasLtMatmul(
+    plan.algo = heuristic_result.algo;
+    plan.workspace_bytes = heuristic_result.workspaceSize;
+    if (plan.workspace_bytes > LT_MAX_WORKSPACE_BYTES) {
+        plan.workspace_bytes = LT_MAX_WORKSPACE_BYTES;
+    }
+
+    cublasLtMatmulPreferenceDestroy(preference);
+    return true;
+
+fail:
+    if (preference) cublasLtMatmulPreferenceDestroy(preference);
+    destroy_lt_plan(plan);
+    return false;
+}
+
+static bool get_cached_lt_plan(int device, int m, int n, int k, LtPlan &plan_out)
+{
+    if (device < 0 || device >= 64) return false;
+
+    LtKey key = make_lt_key(m, n, k);
+    std::lock_guard<std::mutex> lock(lt_cache_mutex[device]);
+    auto &entry = lt_plan_cache[device][key];
+
+    if (!entry.initialized) {
+        entry.initialized = true;
+        entry.available = build_lt_plan(device, key, entry.plan);
+    }
+    if (!entry.available) return false;
+
+    plan_out = entry.plan;
+    return true;
+}
+
+static void* get_lt_workspace(int device, size_t requested_bytes, size_t &granted_bytes)
+{
+    granted_bytes = 0;
+    if (device < 0 || device >= 64) return nullptr;
+    if (requested_bytes == 0) return nullptr;
+
+    size_t target_bytes = requested_bytes;
+    if (target_bytes > LT_MAX_WORKSPACE_BYTES) target_bytes = LT_MAX_WORKSPACE_BYTES;
+
+    if (lt_workspace_bytes[device] < target_bytes) {
+        if (lt_workspace[device] != nullptr) {
+            cudaFree(lt_workspace[device]);
+            lt_workspace[device] = nullptr;
+            lt_workspace_bytes[device] = 0;
+        }
+        cudaError_t err = cudaMalloc(&(lt_workspace[device]), target_bytes);
+        if (err != cudaSuccess) {
+            lt_workspace[device] = nullptr;
+            lt_workspace_bytes[device] = 0;
+            return nullptr;
+        }
+        lt_workspace_bytes[device] = target_bytes;
+    }
+
+    granted_bytes = lt_workspace_bytes[device];
+    return lt_workspace[device];
+}
+
+static bool gpu_mult2D_lt(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int device)
+{
+    LtPlan plan;
+    if (!get_cached_lt_plan(device, m, n, k, plan)) return false;
+
+    const float alpha = 1.0f;
+    const float beta = 0.0f;
+
+    size_t workspace_bytes = 0;
+    void *workspace = get_lt_workspace(device, plan.workspace_bytes, workspace_bytes);
+    if (plan.workspace_bytes > 0 && workspace == nullptr) return false;
+
+    cublasStatus_t status = cublasLtMatmul(
         hcublaslt[device],
-        operation_desc,
+        plan.operation_desc,
         &alpha,
         ptrB,
-        a_desc,
+        plan.a_desc,
         ptrA,
-        b_desc,
+        plan.b_desc,
         &beta,
         ptrC,
-        c_desc,
+        plan.c_desc,
         ptrC,
-        c_desc,
-        &heuristic_result.algo,
+        plan.c_desc,
+        &plan.algo,
         workspace,
-        workspace_size,
+        workspace_bytes,
         0
     );
-
-cleanup:
-    if (preference) cublasLtMatmulPreferenceDestroy(preference);
-    if (c_desc) cublasLtMatrixLayoutDestroy(c_desc);
-    if (b_desc) cublasLtMatrixLayoutDestroy(b_desc);
-    if (a_desc) cublasLtMatrixLayoutDestroy(a_desc);
-    if (operation_desc) cublasLtMatmulDescDestroy(operation_desc);
     return status == CUBLAS_STATUS_SUCCESS;
 }
 
