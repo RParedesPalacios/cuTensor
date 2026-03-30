@@ -52,3 +52,8 @@ Se generan en `benchmark/results/`:
 - El reporte usa `speedup_cutensor_vs_torch = tiempo_torch / tiempo_cutensor`.
   - `> 1.0`: cuTensor mas rapido.
   - `< 1.0`: PyTorch mas rapido.
+- Puedes controlar el modo de computo de cuTensor por entorno:
+  - `CUTENSOR_MATMUL_MODE=fp32` (default)
+  - `CUTENSOR_MATMUL_MODE=tf32` (si la GPU/stack lo soporta)
+- Para trazar backend y fallback en runtime:
+  - `CUTENSOR_MATMUL_DEBUG=1`

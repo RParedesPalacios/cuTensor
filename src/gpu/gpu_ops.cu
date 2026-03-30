@@ -3,6 +3,9 @@
 #include <stdexcept>
 #include <iostream>
 #include <cstddef>
+#include <cstdlib>
+#include <cctype>
+#include <algorithm>
 #include <unordered_map>
 #include <mutex>
 
@@ -51,6 +54,82 @@ void gpu_sumf(float *ptrA, float *ptrC, long int size, float s, int device)
 static constexpr size_t LT_MAX_WORKSPACE_BYTES = 1 << 26; // 64 MiB cap per device
 static void* lt_workspace[64] = {nullptr};
 static size_t lt_workspace_bytes[64] = {0};
+static bool cublas_math_mode_configured[64] = {false};
+static std::mutex cublas_math_mode_mutex[64];
+
+enum class MatmulMode {
+    FP32,
+    TF32
+};
+
+struct MatmulConfig {
+    MatmulMode mode;
+    bool debug;
+};
+
+static bool parse_env_flag(const char *value)
+{
+    if (value == nullptr) return false;
+    std::string v(value);
+    std::transform(v.begin(), v.end(), v.begin(), [](unsigned char c){ return std::tolower(c); });
+    return v == "1" || v == "true" || v == "yes" || v == "on";
+}
+
+static MatmulMode parse_matmul_mode(const char *value)
+{
+    if (value == nullptr) return MatmulMode::FP32;
+    std::string v(value);
+    std::transform(v.begin(), v.end(), v.begin(), [](unsigned char c){ return std::tolower(c); });
+    if (v == "tf32") return MatmulMode::TF32;
+    return MatmulMode::FP32;
+}
+
+static const char* matmul_mode_name(MatmulMode mode)
+{
+    return mode == MatmulMode::TF32 ? "tf32" : "fp32";
+}
+
+static MatmulConfig load_matmul_config()
+{
+    MatmulConfig cfg;
+    cfg.mode = parse_matmul_mode(std::getenv("CUTENSOR_MATMUL_MODE"));
+    cfg.debug = parse_env_flag(std::getenv("CUTENSOR_MATMUL_DEBUG"));
+    if (cfg.debug) {
+        fprintf(stderr, "[cuTensor][matmul] config mode=%s debug=1\n", matmul_mode_name(cfg.mode));
+    }
+    return cfg;
+}
+
+static const MatmulConfig& get_matmul_config()
+{
+    static MatmulConfig cfg = load_matmul_config();
+    return cfg;
+}
+
+static cublasComputeType_t lt_compute_type(MatmulMode mode)
+{
+#ifdef CUBLAS_COMPUTE_32F_FAST_TF32
+    if (mode == MatmulMode::TF32) return CUBLAS_COMPUTE_32F_FAST_TF32;
+#endif
+    return CUBLAS_COMPUTE_32F;
+}
+
+static cublasMath_t cublas_math_mode(MatmulMode mode)
+{
+#ifdef CUBLAS_TF32_TENSOR_OP_MATH
+    if (mode == MatmulMode::TF32) return CUBLAS_TF32_TENSOR_OP_MATH;
+#endif
+    return CUBLAS_DEFAULT_MATH;
+}
+
+static void ensure_cublas_math_mode(int device, MatmulMode mode)
+{
+    if (device < 0 || device >= 64) return;
+    std::lock_guard<std::mutex> lock(cublas_math_mode_mutex[device]);
+    if (cublas_math_mode_configured[device]) return;
+    check_cublas(cublasSetMathMode(hcublas[device], cublas_math_mode(mode)), "cublasSetMathMode");
+    cublas_math_mode_configured[device] = true;
+}
 
 struct LtKey {
     int m_col;
@@ -59,6 +138,7 @@ struct LtKey {
     int lda;
     int ldb;
     int ldc;
+    int mode;
 
     bool operator==(const LtKey &other) const {
         return m_col == other.m_col &&
@@ -66,7 +146,8 @@ struct LtKey {
                k_col == other.k_col &&
                lda == other.lda &&
                ldb == other.ldb &&
-               ldc == other.ldc;
+               ldc == other.ldc &&
+               mode == other.mode;
     }
 };
 
@@ -78,6 +159,7 @@ struct LtKeyHash {
         h = h * 1315423911u + static_cast<size_t>(key.lda);
         h = h * 1315423911u + static_cast<size_t>(key.ldb);
         h = h * 1315423911u + static_cast<size_t>(key.ldc);
+        h = h * 1315423911u + static_cast<size_t>(key.mode);
         return h;
     }
 };
@@ -109,7 +191,7 @@ static void destroy_lt_plan(LtPlan &plan)
     plan = LtPlan{};
 }
 
-static LtKey make_lt_key(int m, int n, int k)
+static LtKey make_lt_key(int m, int n, int k, MatmulMode mode)
 {
     LtKey key;
     // Row-major trick:
@@ -120,10 +202,11 @@ static LtKey make_lt_key(int m, int n, int k)
     key.lda = k;
     key.ldb = n;
     key.ldc = k;
+    key.mode = static_cast<int>(mode);
     return key;
 }
 
-static bool build_lt_plan(int device, const LtKey &key, LtPlan &plan)
+static bool build_lt_plan(int device, const LtKey &key, MatmulMode mode, LtPlan &plan)
 {
     cublasStatus_t status = CUBLAS_STATUS_SUCCESS;
     cublasLtMatmulPreference_t preference = nullptr;
@@ -132,7 +215,7 @@ static bool build_lt_plan(int device, const LtKey &key, LtPlan &plan)
     cublasOperation_t op = CUBLAS_OP_N;
     size_t max_workspace = LT_MAX_WORKSPACE_BYTES;
 
-    status = cublasLtMatmulDescCreate(&plan.operation_desc, CUBLAS_COMPUTE_32F, CUDA_R_32F);
+    status = cublasLtMatmulDescCreate(&plan.operation_desc, lt_compute_type(mode), CUDA_R_32F);
     if (status != CUBLAS_STATUS_SUCCESS) goto fail;
 
     status = cublasLtMatmulDescSetAttribute(
@@ -194,17 +277,25 @@ fail:
     return false;
 }
 
-static bool get_cached_lt_plan(int device, int m, int n, int k, LtPlan &plan_out)
+static bool get_cached_lt_plan(int device, int m, int n, int k, MatmulMode mode, LtPlan &plan_out)
 {
     if (device < 0 || device >= 64) return false;
 
-    LtKey key = make_lt_key(m, n, k);
+    LtKey key = make_lt_key(m, n, k, mode);
     std::lock_guard<std::mutex> lock(lt_cache_mutex[device]);
     auto &entry = lt_plan_cache[device][key];
 
     if (!entry.initialized) {
         entry.initialized = true;
-        entry.available = build_lt_plan(device, key, entry.plan);
+        entry.available = build_lt_plan(device, key, mode, entry.plan);
+        if (get_matmul_config().debug) {
+            fprintf(
+                stderr,
+                "[cuTensor][matmul] plan %s for m=%d n=%d k=%d mode=%s\n",
+                entry.available ? "ready" : "unavailable",
+                m, n, k, matmul_mode_name(mode)
+            );
+        }
     }
     if (!entry.available) return false;
 
@@ -240,10 +331,10 @@ static void* get_lt_workspace(int device, size_t requested_bytes, size_t &grante
     return lt_workspace[device];
 }
 
-static bool gpu_mult2D_lt(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int device)
+static bool gpu_mult2D_lt(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int device, MatmulMode mode)
 {
     LtPlan plan;
-    if (!get_cached_lt_plan(device, m, n, k, plan)) return false;
+    if (!get_cached_lt_plan(device, m, n, k, mode, plan)) return false;
 
     const float alpha = 1.0f;
     const float beta = 0.0f;
@@ -280,10 +371,19 @@ void gpu_mult2D(float *ptrA, float *ptrB, float *ptrC, int m, int n, int k, int 
         throw std::runtime_error("error setting device in gpu_mult2D");
     }
     check_cuda(cudaSetDevice(device), "gpu_mult2D_set_device");
+    const MatmulConfig &cfg = get_matmul_config();
+    ensure_cublas_math_mode(device, cfg.mode);
 
     // Preferred path for newer CUDA stacks/GPUs.
     // If unsupported on this device/runtime, fallback is classic SGEMM.
-    if (!gpu_mult2D_lt(ptrA, ptrB, ptrC, m, n, k, device)) {
+    if (!gpu_mult2D_lt(ptrA, ptrB, ptrC, m, n, k, device, cfg.mode)) {
+        if (cfg.debug) {
+            fprintf(
+                stderr,
+                "[cuTensor][matmul] fallback sgemm for m=%d n=%d k=%d mode=%s\n",
+                m, n, k, matmul_mode_name(cfg.mode)
+            );
+        }
         float alpha = 1.0f;
         float beta = 0.0f;
         check_cublas(
