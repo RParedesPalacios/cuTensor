@@ -19,6 +19,9 @@ class CMakeBuild(build_ext):
         extdir = os.path.abspath(os.path.dirname(self.get_ext_fullpath(ext.name)))
         cmake_args = ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
                       '-DPYTHON_EXECUTABLE=' + os.sys.executable]
+        cuda_architectures = self._resolve_cuda_architectures()
+        if cuda_architectures:
+            cmake_args.append('-DCMAKE_CUDA_ARCHITECTURES=' + cuda_architectures)
         cuda_host_compiler = self._resolve_cuda_host_compiler()
         if cuda_host_compiler:
             cmake_args.append('-DCMAKE_CUDA_HOST_COMPILER=' + cuda_host_compiler)
@@ -49,6 +52,20 @@ class CMakeBuild(build_ext):
                 compiler = shutil.which(candidate)
                 if compiler:
                     return compiler
+
+        return None
+
+    @staticmethod
+    def _resolve_cuda_architectures():
+        # Respect explicit configuration first.
+        explicit = os.environ.get('CMAKE_CUDA_ARCHITECTURES') or os.environ.get('CUDAARCHS')
+        if explicit:
+            return explicit
+
+        # CUDA 13 dropped support for very old SM targets (e.g. sm_52),
+        # while CMake compiler probing can still try them if unspecified.
+        if platform.system() == 'Linux' and platform.machine() in ('aarch64', 'arm64'):
+            return 'native'
 
         return None
 

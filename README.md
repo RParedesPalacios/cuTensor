@@ -38,6 +38,14 @@ This repository also includes an ARM64 nvcc compatibility shim
 (`compat/nvcc/include/bits/math-vector.h`) that is passed automatically
 through `CMAKE_CUDA_FLAGS` during `setup.py` builds.
 
+On Linux ARM64, `setup.py` also sets `CMAKE_CUDA_ARCHITECTURES=native` by
+default to avoid old architecture probes like `sm_52` that fail on CUDA 13.
+You can override it with:
+
+```console
+export CMAKE_CUDA_ARCHITECTURES=100
+```
+
 ## Test the installation
 ```console
 python -c "import cuTensor"
