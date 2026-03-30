@@ -19,4 +19,4 @@ set_target_properties(cuTensor PROPERTIES
                       POSITION_INDEPENDENT_CODE ON
                       CUDA_SEPARABLE_COMPILATION ON)
 
-target_link_libraries(cuTensor PRIVATE CUDA::cublas pybind11::pybind11)
+target_link_libraries(cuTensor PRIVATE CUDA::cublas CUDA::cublasLt pybind11::pybind11)
