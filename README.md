@@ -34,6 +34,10 @@ If `python setup.py build_ext --inplace` fails on ARM64 with errors in
 `/usr/include/aarch64-linux-gnu/bits/math-vector.h`, install `g++-12` and set
 `CUDAHOSTCXX=/usr/bin/g++-12` before building.
 
+This repository also includes an ARM64 nvcc compatibility shim
+(`compat/nvcc/include/bits/math-vector.h`) that is passed automatically
+through `CMAKE_CUDA_FLAGS` during `setup.py` builds.
+
 ## Test the installation
 ```console
 python -c "import cuTensor"
